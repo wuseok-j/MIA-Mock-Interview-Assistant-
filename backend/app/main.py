@@ -1,12 +1,11 @@
 """꼬리면접 API 서버.
 
-지금은 AI 대신 mock_ai_* 함수가 가짜 응답을 준다.
-팀원 B가 app/ai.py 를 만들면 mock 함수를 실제 호출로 바꾸면 된다.
+AI 호출은 모두 app/ai.py 를 거친다. (지금은 ai.py 가 가짜 응답을 준다)
 """
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import harness
+from . import ai, harness
 from .schemas import AnswerRequest, ItemScore, QuestionReport, Report, StartRequest, Turn
 
 app = FastAPI(title="꼬리면접 API")
@@ -18,26 +17,22 @@ app.add_middleware(
 )
 
 
-# ---------- 가짜 AI (2주차에 실제 API 호출로 교체) ----------
-def mock_ai_followup(question: dict, answer: str) -> dict:
-    """답변이 짧으면 꼬리질문을 제안하는 흉내."""
-    if len(answer) < 30:
-        return {"need_followup": True, "utterance": "조금 더 구체적인 경험이나 예시를 들어 설명해 주시겠어요?"}
-    return {"need_followup": False, "utterance": ""}
-
-
-def mock_ai_report(iv: harness.Interview) -> list[QuestionReport]:
+def _build_report(iv: harness.Interview) -> list[QuestionReport]:
+    """ai.evaluate 결과를 화면용 형식으로 바꾼다.
+    TODO(장우석): 점수 범위·항목 수 검증, 실패 시 재평가 요청
+    """
+    by_id = {r["question_id"]: r for r in ai.evaluate(iv.plan, iv.transcript)}
     items = []
     for q in iv.plan:
+        r = by_id[q["id"]]
         items.append(QuestionReport(
             question_id=q["id"],
             question=q["question"],
-            scores=[ItemScore(criterion=c, score=1) for c in q["rubric"]],
-            evidence="(가짜 데이터) 답변에서 개념은 설명했으나 예시가 부족함",
-            improvement="(가짜 데이터) 실제 프로젝트 경험을 한 가지 들어 설명해 보세요.",
+            scores=[ItemScore(**s) for s in r["scores"]],
+            evidence=r["evidence"],
+            improvement=r["improvement"],
         ))
     return items
-# -------------------------------------------------------------
 
 
 def _get(interview_id: str) -> harness.Interview:
@@ -59,7 +54,9 @@ def submit_answer(interview_id: str, req: AnswerRequest):
     iv = _get(interview_id)
     if iv.finished:
         raise HTTPException(400, "이미 끝난 면접입니다.")
-    suggestion = mock_ai_followup(harness.current_question(iv), req.answer)
+    q = harness.current_question(iv)
+    history = [t for t in iv.transcript if t["question_id"] == q["id"]]
+    suggestion = ai.judge_followup(q, req.answer, history)
     kind, question = harness.submit_answer(iv, req.answer, suggestion)
     return Turn(interview_id=iv.id, type=kind, question=question, progress=harness.progress(iv))
 
@@ -69,7 +66,7 @@ def get_report(interview_id: str):
     iv = _get(interview_id)
     if not iv.finished:
         raise HTTPException(400, "면접이 아직 끝나지 않았습니다.")
-    questions = mock_ai_report(iv)
+    questions = _build_report(iv)
     total = sum(s.score for q in questions for s in q.scores)
     max_score = sum(2 * len(q.scores) for q in questions)
     return Report(interview_id=iv.id, total_score=total, max_score=max_score, questions=questions)

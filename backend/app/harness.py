@@ -9,6 +9,8 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import ai
+
 MAIN_QUESTIONS = 5
 MAX_FOLLOWUP = 2
 DATA = Path(__file__).resolve().parents[2] / "data" / "question_bank.json"
@@ -26,7 +28,7 @@ class Interview:
     finished: bool = False
 
 
-# TODO(팀원 C): 2주차에 SQLite 로 교체
+# TODO(장우석): 2주차에 SQLite 로 교체
 INTERVIEWS: dict[str, Interview] = {}
 
 
@@ -36,8 +38,9 @@ def load_bank() -> list[dict]:
 
 def create_interview(job: str, cover_letter: str) -> Interview:
     bank = load_bank()
-    # TODO(팀원 B): 자기소개서 기반 질문 2개를 AI로 생성해 plan 앞에 추가
-    plan = random.sample(bank, k=min(MAIN_QUESTIONS, len(bank)))
+    cl_questions = ai.generate_cover_letter_questions(cover_letter) if cover_letter.strip() else []
+    rest = MAIN_QUESTIONS - len(cl_questions)
+    plan = cl_questions + random.sample(bank, k=min(rest, len(bank)))
     iv = Interview(id=uuid.uuid4().hex[:12], job=job, cover_letter=cover_letter, plan=plan)
     INTERVIEWS[iv.id] = iv
     _log(iv, "interviewer", plan[0]["question"])

@@ -7,18 +7,19 @@
 
 | 폴더 | 내용 | 담당 |
 |---|---|---|
-| `frontend/` | React 화면 (설정 · 면접 · 리포트) | 팀원 A |
-| `backend/app/` | FastAPI 서버, 면접 상태 관리(하네스) | 팀원 C |
-| `backend/app/prompts.py` | AI 프롬프트 | 팀원 B |
-| `backend/first_run.py` | 1주차 API 첫 실행 확인 스크립트 | 팀원 B |
-| `data/` | 질문은행 · 루브릭 JSON | 팀원 D |
+| `frontend/` | React 화면 (설정 · 면접 · 리포트) | 곽동규 |
+| `backend/app/` | FastAPI 서버, 면접 상태 관리(하네스) | 장우석 |
+| `backend/app/ai.py`, `prompts.py` | AI 호출 · 프롬프트 · 인젝션 방어 | 김채희 |
+| `backend/first_run.py` | 1주차 API 첫 실행 확인 스크립트 | 김채희 |
+| `data/` | 질문은행 · 루브릭 JSON, 검증 자료 | 조민선 |
 | `docs/` | 수행계획서, API 명세, 회의록 | 전원 |
+| `docs/tasks/` | **팀원별 할 일** | 전원 |
 
 ## 처음 받았을 때
 
 ```bash
-git clone <레포 주소>
-cd kkori-interview
+git clone https://github.com/wuseok-j/MIA-Mock-Interview-Assistant-.git
+cd MIA-Mock-Interview-Assistant-
 cp .env.example .env          # .env 에 API 키 입력 (Windows: copy .env.example .env)
 
 cd backend
