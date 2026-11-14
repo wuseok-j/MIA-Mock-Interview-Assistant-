@@ -1,0 +1,155 @@
+{
+  "id": "fire_office",
+  "version": "0.1",
+  "title": "오피스 화재 대피",
+  "summary": "근무 중인 7층 사무실 탕비실에서 연기가 난다. 동료와 함께 건물 밖까지 안전하게 대피하라.",
+  "category": "화재",
+  "thumbnail": "fire_office/thumbnail.png",
+  "estimated_minutes": 7,
+
+  "role_doc": {
+    "place": "도심 10층 오피스 빌딩 7층 사무실 (직원 약 30명)",
+    "situation": "평일 오후 3시. 탕비실 전자레인지 쪽에서 불이 시작됐다. 이용자는 이 회사 직원이고, 옆자리 동료 박지훈과 함께 있다.",
+    "rules": [
+      "캐릭터는 실제 화재 현장의 사람처럼 짧고 급박하게 말한다 (1~2문장).",
+      "캐릭터는 정답이나 올바른 행동을 먼저 알려주지 않는다. 이용자가 판단하게 둔다.",
+      "재난 상황과 무관한 대화에는 짧게 반응하고 지금 상황으로 돌아온다.",
+      "선정적·폭력적 묘사, 욕설은 하지 않는다. 부상은 '연기를 마셔 기침한다' 수준으로만 표현한다."
+    ]
+  },
+
+  "characters": [
+    {
+      "id": "jihoon",
+      "name": "박지훈",
+      "role": "옆자리 동료 (입사 2년 차)",
+      "personality": "낙천적이고 성격이 급하다. 위험을 가볍게 보고 빠른 길을 고르려 한다. 설득당하면 순순히 따른다.",
+      "speech_style": "반말, 짧은 문장, 감탄사가 많다.",
+      "image": "fire_office/jihoon.png"
+    },
+    {
+      "id": "firefighter",
+      "name": "최민호 소방관",
+      "role": "현장에 도착한 소방관",
+      "personality": "침착하고 단호하다. 필요한 정보만 빠르게 묻는다.",
+      "speech_style": "존댓말, 짧고 명확하게.",
+      "image": "fire_office/firefighter.png"
+    }
+  ],
+
+  "max_risk": 6,
+
+  "stages": [
+    {
+      "stage": 1,
+      "title": "화재 발견",
+      "situation": "탕비실 문틈으로 회색 연기가 새어 나오고 타는 냄새가 난다. 아직 화재경보는 울리지 않았다.",
+      "character_id": "jihoon",
+      "opening_line": "어? 누가 또 전자레인지에 뭐 태웠나 보다. 냄새 좀 빠지면 괜찮겠지?",
+      "correct_action": "큰 소리로 '불이야'를 외쳐 주변에 알리고, 화재 발신기(비상벨)를 누르거나 119에 신고한다.",
+      "keywords": ["불이야", "119", "신고", "비상벨", "발신기", "경보", "알려", "알리"],
+      "wrong_keywords": ["괜찮", "기다리", "무시", "계속 일", "모른 척"],
+      "next_if_correct": 2,
+      "if_wrong": { "narration": "머뭇거리는 사이 연기가 사무실 천장을 따라 퍼지기 시작했다.", "risk_delta": 2 },
+      "reactions": {
+        "correct": "헉, 진짜 불이야? 알았어, 나도 사람들한테 소리칠게!",
+        "wrong": "그치? 별일 아니겠지… 근데 연기가 좀 많아지는 것 같은데?",
+        "unclear": "응? 그래서 어떻게 하자는 거야?"
+      },
+      "image": "fire_office/stage1_smoke_pantry.png"
+    },
+    {
+      "stage": 2,
+      "title": "엘리베이터 앞",
+      "situation": "비상벨이 울리고 사람들이 복도로 나온다. 복도 천장에 연기가 얇게 깔렸다. 박지훈이 엘리베이터 버튼을 연타한다.",
+      "character_id": "jihoon",
+      "opening_line": "엘리베이터 금방 온다! 7층이면 계단보다 이게 훨씬 빨라, 빨리 타!",
+      "correct_action": "엘리베이터는 정전으로 멈추거나 연기가 들어올 수 있으므로 타지 않고, 동료를 말려 비상계단으로 대피한다.",
+      "keywords": ["계단", "타지 마", "타지마", "타면 안", "엘리베이터 안 타", "비상구"],
+      "wrong_keywords": ["같이 타", "타자", "얼른 타", "엘리베이터 타", "기다리"],
+      "next_if_correct": 3,
+      "if_wrong": { "narration": "엘리베이터 문이 열리자 통로 안쪽으로 연기가 빨려 들어간다. 박지훈은 그래도 타려 한다.", "risk_delta": 3 },
+      "reactions": {
+        "correct": "아… 맞다, 불 나면 엘리베이터 멈출 수 있다고 했지. 계단으로 가자!",
+        "wrong": "그치? 빨리 와, 문 닫힌다!",
+        "unclear": "뭐? 엘리베이터 왔다니까, 탈 거야 말 거야?"
+      },
+      "image": "fire_office/stage2_elevator.png"
+    },
+    {
+      "stage": 3,
+      "title": "연기 찬 계단",
+      "situation": "비상계단으로 내려가는데 5층부터 연기가 짙어져 앞이 잘 보이지 않는다. 박지훈이 기침을 하며 허리를 편 채 뛰려 한다.",
+      "character_id": "jihoon",
+      "opening_line": "콜록… 숨 막혀! 그냥 숨 참고 뛰어 내려가자!",
+      "correct_action": "젖은 수건이나 옷소매로 코와 입을 막고, 자세를 낮춰 벽을 짚으며 침착하게 이동한다.",
+      "keywords": ["낮춰", "낮추", "자세", "숙여", "숙이", "수건", "소매", "코와 입", "코랑 입", "입을 막", "입 막", "기어", "벽을 짚", "벽 짚"],
+      "wrong_keywords": ["뛰어 내려", "뛰자", "달리자", "숨 참고", "빨리 뛰"],
+      "next_if_correct": 4,
+      "if_wrong": { "narration": "연기를 들이마신 박지훈이 계단에 주저앉아 기침을 멈추지 못한다.", "risk_delta": 2 },
+      "reactions": {
+        "correct": "콜록… 알았어, 소매로 막고 숙일게. 벽 잡고 천천히 가자.",
+        "wrong": "콜록콜록… 숨이… 너무 매워…",
+        "unclear": "콜록… 뭐라고? 어떻게 하라고?"
+      },
+      "image": "fire_office/stage3_smoky_stairs.png"
+    },
+    {
+      "stage": 4,
+      "title": "닫힌 비상구 문",
+      "situation": "3층 계단참. 아래 계단은 적치물로 막혀 있어 3층 복도를 지나 반대편 계단으로 가야 한다. 복도로 나가는 문틈 아래로 연기가 조금 새어 나온다.",
+      "character_id": "jihoon",
+      "opening_line": "이 문만 지나면 반대쪽 계단이야! 확 열어 버릴게!",
+      "correct_action": "문을 열기 전에 손등으로 손잡이와 문의 온도를 확인하고, 뜨거우면 열지 않고 다른 대피 경로를 찾는다.",
+      "keywords": ["손잡이", "손등", "만져", "뜨거", "온도", "열지 마", "열면 안", "다른 길", "다른 계단", "다른 경로"],
+      "wrong_keywords": ["열어", "확 열", "박차", "밀고 나가"],
+      "next_if_correct": 5,
+      "if_wrong": { "narration": "문을 벌컥 열자 뜨거운 연기가 쏟아져 나왔다. 두 사람은 황급히 문을 다시 닫았다.", "risk_delta": 3 },
+      "reactions": {
+        "correct": "손잡이가… 앗 뜨거! 이쪽 아니다. 위층으로 돌아가서 반대편 계단 찾자.",
+        "wrong": "좋아, 연다!",
+        "unclear": "그래서 열어, 말아? 빨리 정해!"
+      },
+      "image": "fire_office/stage4_door.png"
+    },
+    {
+      "stage": 5,
+      "title": "건물 밖 대피 장소",
+      "situation": "반대편 계단으로 무사히 건물 밖에 나왔다. 소방차가 도착했고, 박지훈은 노트북을 두고 왔다며 다시 들어가려 한다. 소방관이 다가온다.",
+      "character_id": "firefighter",
+      "opening_line": "다치신 데 없습니까? 불이 어디서 났는지, 안에 남은 사람이 있는지 아시는 대로 말씀해 주십시오.",
+      "correct_action": "다시 건물에 들어가지 않고(동료도 말린다), 소방관에게 화재 위치(7층 탕비실)와 남아 있을 수 있는 사람 정보를 알린다.",
+      "keywords": ["7층", "칠층", "탕비실", "남아", "남은 사람", "들어가지 마", "들어가면 안", "말려"],
+      "wrong_keywords": ["가지러", "가져올", "같이 들어", "모르겠"],
+      "next_if_correct": null,
+      "if_wrong": { "narration": "소방관이 정보를 얻지 못해 수색 범위를 정하는 데 시간이 더 걸린다.", "risk_delta": 2 },
+      "reactions": {
+        "correct": "7층 탕비실, 알겠습니다. 동료분도 절대 다시 들어가지 마십시오. 협조 감사합니다.",
+        "wrong": "지금 건물 진입은 위험합니다. 화재 위치부터 알려 주십시오.",
+        "unclear": "정확히 몇 층, 어디서 불이 났습니까?"
+      },
+      "image": "fire_office/stage5_outside.png"
+    }
+  ],
+
+  "evaluation": [
+    { "id": "c1", "stage": 1, "criterion": "화재를 발견하면 즉시 주변에 알리고 신고했다" },
+    { "id": "c2", "stage": 2, "criterion": "엘리베이터 대신 계단으로 대피했다" },
+    { "id": "c3", "stage": 3, "criterion": "연기 속에서 자세를 낮추고 코와 입을 막았다" },
+    { "id": "c4", "stage": 4, "criterion": "문을 열기 전 손잡이 온도를 확인했다" },
+    { "id": "c5", "stage": 5, "criterion": "대피 후 다시 들어가지 않고 소방대에 정보를 전달했다" }
+  ],
+
+  "sources": [
+    {
+      "name": "국민재난안전포털 – 화재 국민행동요령",
+      "url": "https://www.safekorea.go.kr",
+      "note": "TODO(조민선): 각 단계 correct_action 을 원문과 대조하고 정확한 페이지 주소로 바꾸기"
+    },
+    {
+      "name": "소방청 – 화재 시 대피 요령",
+      "url": "https://www.nfa.go.kr",
+      "note": "TODO(조민선): 원문 확인 후 페이지 주소 기록"
+    }
+  ]
+}
