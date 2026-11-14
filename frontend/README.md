@@ -10,6 +10,8 @@ cd backend
 .venv\Scripts\activate        # Mac: source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
+activate 가 빨간 오류로 막히면 루트 `README.md` 의 "Windows에서 activate 가 막히면" 참고.
+(급하면 `.venv\Scripts\python -m uvicorn app.main:app --reload` 로 바로 실행)
 
 프론트를 켠다 (터미널 2):
 ```bash
