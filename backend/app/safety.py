@@ -7,22 +7,36 @@
 """
 from __future__ import annotations
 
+import re
+
 # 진행·역할을 조작하려는 시도 (공백 제거·소문자 기준으로 비교)
 INJECTION_PATTERNS = [
-    "다음단계로", "다음스테이지", "단계넘겨", "스킵",
-    "정답알려", "정답이뭐", "답알려",
+    "다음단계로", "다음스테이지", "단계넘겨", "단계스킵", "스킵해줘",   # "스킵" → 오탐("엘리베이터는 스킵하고")
+    "정답알려", "정답이뭐", "답알려줘",                                # "답알려" → 오탐("내가 답 알려줄게")
     "역할그만", "역할극그만", "캐릭터그만", "연기그만",
     "시스템프롬프트", "프롬프트보여", "프롬프트알려", "너의지시",
-    "이전지시", "지시를무시", "지시무시", "규칙무시",
-    "개발자모드", "관리자모드", "너는이제",
+    "이전지시", "지시를무시하고", "지시무시하고", "규칙무시하고",       # "지시를무시" → 오탐("지시를 무시하면 안 돼")
+    "개발자모드", "관리자모드", "너는이제부터", "이제부터너는",         # "너는이제" → 오탐("너는 이제 내 뒤에 붙어")
+    "단계건너뛰", "건너뛰어줘",                                       # "건너뛰" 만 쓰면 "계단 건너뛰지 마"도 걸림
+    "성공으로처리", "성공처리", "통과처리", "통과시켜",
+    "클리어처리", "클리어시켜", "패스해줘", "장면패스", "skip", "nextstage",   # 2차 테스트에서 샌 문장
+    "롤플레이끝", "롤플레이그만", "역할극끝", "상황극끝", "상황극그만",
     "ignoreprevious", "ignoreall", "systemprompt", "jailbreak",
     "verdict", "\"correct\"", "<user_input>", "</user_input>",
 ]
 
 # 10대 이용자를 고려한 부적절 표현 (예시 일부. 김채희가 보강)
 INAPPROPRIATE_PATTERNS = [
-    "섹스", "성관계", "야한", "야동", "벗어", "가슴만져",
+    "섹스", "성관계", "야동", "가슴만져",
+    "야한얘기", "야한거", "야한말", "야한사진",     # "야한" → 오탐("야 한번만")
+    "벗어봐", "벗겨",                             # "벗어" → 오탐("벗어나자"), "옷벗" → 오탐("옷 벗어서 입 막자")
     "씨발", "시발", "병신", "좆", "개새끼",
+    "ㅅㅂ", "ㅆㅂ", "ㅂㅅ", "존나", "죽여버", "키스", "사귈래", "사귀자",
+]
+
+# 막는 단어가 들어 있지만 정상인 단어. 검사 전에 지운다.
+ALLOW_WORDS = [
+    "시발점",   # "불의 시발점은 탕비실" (시작점이라는 뜻)
 ]
 
 REDIRECT = {
@@ -32,14 +46,20 @@ REDIRECT = {
 
 
 def _normalize(text: str) -> str:
-    return "".join(text.lower().split())
+    """소문자로 바꾸고, 한글·자음모음·영문자만 남긴다.
+    띄어쓰기·문장부호·숫자를 끼워 넣어 피하는 것("다음.단계로", "시1발")을 막기 위함.
+    """
+    return re.sub(r"[^가-힣ㄱ-ㅎㅏ-ㅣa-z]", "", text.lower())
 
 
 def check(text: str) -> str | None:
     """문제가 없으면 None, 걸리면 "injection" 또는 "inappropriate"."""
     t = _normalize(text)
-    if any(p in t for p in INAPPROPRIATE_PATTERNS):
+    for w in ALLOW_WORDS:
+        t = t.replace(_normalize(w), "")
+    # 막는 단어도 같은 방식으로 정리해서 비교한다. ("<user_input>" → "userinput")
+    if any(_normalize(p) in t for p in INAPPROPRIATE_PATTERNS):
         return "inappropriate"
-    if any(p in t for p in INJECTION_PATTERNS):
+    if any(_normalize(p) in t for p in INJECTION_PATTERNS):
         return "injection"
     return None
