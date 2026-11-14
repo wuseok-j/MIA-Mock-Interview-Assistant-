@@ -45,6 +45,12 @@ source .venv/bin/activate     # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
+> **Windows에서 `.venv\Scripts\activate` 가 빨간 오류("스크립트를 실행할 수 없으므로…")로 막히면**
+> PowerShell 기본 보안 설정 때문이다. 둘 중 하나로 해결한다.
+> - **한 번만 설정 (추천):** `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` 입력 → `Y`. 내 계정에서만 적용되고 관리자 권한은 필요 없다. 이후 activate 가 정상 동작한다.
+> - **활성화 없이 실행:** 명령 앞에 `.venv\Scripts\python -m` 을 붙인다.
+>   예) `.venv\Scripts\python -m pip install -r requirements.txt`, `.venv\Scripts\python -m uvicorn app.main:app --reload`
+
 ### 하네스 동작 확인 (API 키 없어도 됨)
 ```bash
 python play_test.py
