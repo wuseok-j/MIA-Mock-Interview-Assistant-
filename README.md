@@ -30,7 +30,7 @@
 | `docs/api-spec.md` | 프론트 ↔ 백엔드 API 명세 |
 | `docs/research/` | 유사 서비스·시장 조사 |
 | `docs/tasks/` | **팀원별 할 일** |
-| `frontend/` | React 화면 (예정) |
+| `frontend/` | React 웹 프로토타입 (목록 → 플레이 → 리포트) |
 
 ## 처음 받았을 때
 
@@ -56,6 +56,15 @@ python play_test.py
 uvicorn app.main:app --reload
 ```
 http://localhost:8000/docs 에서 `POST /sessions` → `POST /sessions/{id}/messages` 순서로 직접 플레이할 수 있다.
+
+### 웹 화면으로 플레이
+서버를 켜 둔 채로 다른 터미널에서:
+```bash
+cd frontend
+npm install      # 처음 한 번만
+npm run dev
+```
+http://localhost:5173 → 시나리오 선택 → 채팅 플레이 → 리포트. (자세한 내용은 `frontend/README.md`)
 
 ### 실제 AI 첫 호출 확인
 ```bash
