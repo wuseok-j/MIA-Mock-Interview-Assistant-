@@ -11,6 +11,7 @@
 
 ## 먼저 할 것 (전원, 30분)
 
+0. **[협업 가이드](../협업가이드.md) 읽기** — GitHub Desktop으로 작업 올리는 방법
 1. 레포를 받고(GitHub Desktop → Fetch/Pull) 루트 `README.md` 의 "처음 받았을 때"대로 설치
 2. `python play_test.py` 실행 → 화재 시나리오가 3번 자동으로 도는 걸 눈으로 확인
 3. `uvicorn app.main:app --reload` → http://localhost:8000/docs 에서 **직접 한 판 플레이**

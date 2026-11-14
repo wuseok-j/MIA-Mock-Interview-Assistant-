@@ -65,6 +65,8 @@ python first_run.py
 
 ## 협업 규칙
 
+> 처음이라면 **[협업 가이드](docs/협업가이드.md)** 부터 — GitHub Desktop으로 브랜치 → PR 올리는 법을 순서대로 정리했다.
+
 1. `main` 브랜치에는 직접 push 하지 않는다. 기능별 브랜치에서 작업 후 PR로 합친다.
    - 브랜치 이름: `feat/채팅화면`, `content/지진시나리오`, `docs/서비스조사` 처럼 `종류/내용`
 2. **PR 승인·머지는 장우석만 한다.** (`main` 보호 규칙 + `.github/CODEOWNERS`) PR을 올리면 단톡에 링크를 남긴다.
