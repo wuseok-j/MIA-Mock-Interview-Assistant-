@@ -3,8 +3,8 @@
 서버(harness.py)는 이 파일의 함수 2개만 부른다.
 함수 이름·입력·반환 형식은 팀 합의 사항이므로, 바꿀 때는 장우석과 먼저 이야기한다.
 
-지금은 '가짜 AI'다: 시나리오 JSON의 keywords 로 판정하고, reactions 문장을 대사로 돌려준다.
-덕분에 API 키 없이도 시나리오 한 판이 끝까지 돈다. 각 함수의 TODO 를 실제 API 호출로 바꾸면 된다.
+judge_action 은 실제 API 를 호출한다. (.env 에 LLM_API_KEY 가 없으면 키워드 기반 가짜 AI 로 동작)
+evaluate 는 아직 가짜 응답이다. (4주차에 상위 모델로 교체)
 
 실제 호출로 바꿀 때 지킬 것
 - 진행(judge_action): 경량 모델 LLM_MODEL_FAST / 리포트(evaluate): 상위 모델 LLM_MODEL_SMART
@@ -17,9 +17,97 @@
 """
 from __future__ import annotations
 
+import json
+import logging
+import os
+import time
+from pathlib import Path
+
+import anthropic
+from dotenv import load_dotenv
+
+from . import prompts
+
+load_dotenv(Path(__file__).resolve().parents[2] / ".env")
+log = logging.getLogger("mia.ai")
+logging.basicConfig(level=logging.INFO, format="%(message)s")
+
+MODEL_FAST = os.getenv("LLM_MODEL_FAST", "claude-haiku-5-5")
+FALLBACK_JUDGE = {"verdict": "unclear", "reply": "", "reason": "fallback"}
+
+_client: anthropic.Anthropic | None = None
+
+
+def _api_key() -> str | None:
+    key = os.getenv("LLM_API_KEY", "").strip()
+    return key if key and not key.startswith("여기에") else None
+
+
+def _get_client() -> anthropic.Anthropic:
+    global _client
+    if _client is None:
+        # max_retries=1: 네트워크 오류·429·5xx 는 SDK 가 1회 자동 재시도한다. (팀 규칙: API 오류 1회 재시도)
+        _client = anthropic.Anthropic(api_key=_api_key(), max_retries=1, timeout=30.0)
+    return _client
+
 
 def judge_action(scenario: dict, stage: dict, character: dict,
                  user_text: str, history: list[dict]) -> dict:
+    """(아래 _mock_judge_action 과 같은 계약) 이용자 행동 판정 + 캐릭터 대사.
+
+    API 키가 없으면 키워드 기반 가짜 AI 로 동작한다. (키 없는 팀원도 play_test 가 돌도록)
+    """
+    if not _api_key():
+        return _mock_judge_action(scenario, stage, character, user_text, history)
+
+    system = prompts.judge_system(scenario, stage, character)
+    user = prompts.judge_user(history, user_text)
+
+    # JSON 형식 오류·빈 응답이면 1회 재요청, 두 번 다 실패하면 fallback.
+    for attempt in (1, 2):
+        try:
+            start = time.time()
+            res = _get_client().messages.create(
+                model=MODEL_FAST,
+                max_tokens=2000,
+                system=system,
+                messages=[{"role": "user", "content": user}],
+                # 대화형·빠른 응답이 중요하므로 생각(thinking) 깊이를 낮게.
+                output_config={
+                    "effort": "low",
+                    "format": {"type": "json_schema", "schema": prompts.JUDGE_SCHEMA},
+                },
+            )
+            elapsed = time.time() - start
+        except anthropic.APIError as e:
+            # SDK 재시도까지 실패한 API 오류 (키 오류·잘못된 모델 이름 포함). 같은 요청을 또 보내도 소용없다.
+            log.warning("[ai] judge_action API 오류: %s", e)
+            return dict(FALLBACK_JUDGE)
+
+        # 토큰 사용량 기록 (어디에 저장할지는 장우석·조민선과 상의 → 지금은 서버 로그에만)
+        u = res.usage
+        log.info("[ai] judge_action model=%s %.2fs in=%s out=%s stop=%s",
+                 MODEL_FAST, elapsed, u.input_tokens, u.output_tokens, res.stop_reason)
+
+        if res.stop_reason == "refusal":
+            log.warning("[ai] 모델이 응답을 거절함 → fallback")
+            return dict(FALLBACK_JUDGE)
+
+        try:
+            text = next(b.text for b in res.content if b.type == "text")
+            data = json.loads(text)
+            if data.get("verdict") in ("correct", "wrong", "unclear") and isinstance(data.get("reply"), str):
+                return {"verdict": data["verdict"], "reply": data["reply"].strip(),
+                        "reason": str(data.get("reason", ""))}
+        except (StopIteration, json.JSONDecodeError):
+            pass
+        log.warning("[ai] 응답 형식 오류 (시도 %d/2)", attempt)
+
+    return dict(FALLBACK_JUDGE)
+
+
+def _mock_judge_action(scenario: dict, stage: dict, character: dict,
+                       user_text: str, history: list[dict]) -> dict:
     """이용자의 행동(말)을 보고 판정을 '제안'하고, 캐릭터의 다음 대사를 만든다.
 
     scenario:  시나리오 전체 (role_doc 등)
@@ -37,7 +125,7 @@ def judge_action(scenario: dict, stage: dict, character: dict,
     실패 시 {"verdict": "unclear", "reply": "", "reason": "fallback"}
       → reply 가 비어 있으면 서버가 stage["reactions"] 문장을 대신 쓴다.
     """
-    # TODO(김채희): 실제 API 호출로 교체. 아래는 키워드 기반 가짜 판정.
+    # API 키가 없을 때 쓰는 키워드 기반 가짜 판정.
     text = "".join(user_text.split())
     if any("".join(k.split()) in text for k in stage["keywords"]):
         verdict = "correct"
