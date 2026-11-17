@@ -19,6 +19,7 @@ class ScenarioSummary(BaseModel):
     estimated_minutes: Optional[int] = None
     total_stages: int
     characters: list[Character]
+    briefing: dict = Field(default_factory=dict)
 
 
 class StartRequest(BaseModel):
@@ -46,6 +47,31 @@ class Turn(BaseModel):
     max_risk: int
     image: Optional[str] = None
     status: Literal["playing", "cleared", "failed"]
+    conditions: list[str] = Field(default_factory=list)
+    attempts_left: int = 3
+
+
+class Source(BaseModel):
+    name: str
+    url: str
+
+
+class Evidence(BaseModel):
+    id: str
+    label: str
+    met: bool
+    quote: str
+    sources: list[Source]
+
+
+class Decision(BaseModel):
+    stage: int
+    title: str
+    action: str
+    verdict: Literal["correct", "wrong", "unclear"]
+    risk_before: int
+    risk_after: int
+    outcome: str
 
 
 class CheckResult(BaseModel):
@@ -56,11 +82,9 @@ class CheckResult(BaseModel):
     result: Literal["correct", "failed", "not_reached"]
     correct_action: str
     comment: str
-
-
-class Source(BaseModel):
-    name: str
-    url: str
+    user_actions: list[str] = Field(default_factory=list)
+    attempts: int = 0
+    evidence: list[Evidence] = Field(default_factory=list)
 
 
 class Report(BaseModel):
@@ -74,3 +98,6 @@ class Report(BaseModel):
     summary: str
     checks: list[CheckResult]
     sources: list[Source]
+    timeline: list[Decision] = Field(default_factory=list)
+    conditions: list[str] = Field(default_factory=list)
+    review_points: list[str] = Field(default_factory=list)

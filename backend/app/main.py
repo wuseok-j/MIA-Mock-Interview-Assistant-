@@ -31,6 +31,7 @@ def _turn(s: harness.Session, messages: list[dict]) -> Turn:
         session_id=s.id, messages=messages,
         stage=st["stage"], stage_title=st["title"], total_stages=len(s.scenario["stages"]),
         risk=s.risk, max_risk=s.scenario["max_risk"], image=st.get("image"), status=s.status,
+        conditions=harness.public_conditions(s), attempts_left=max(0, harness.MAX_TURNS_PER_STAGE - s.turns_in_stage) if s.status == "playing" else 0,
     )
 
 

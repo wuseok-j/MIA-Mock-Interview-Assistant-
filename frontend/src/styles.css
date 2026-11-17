@@ -16,6 +16,41 @@
   background: var(--bg);
 }
 
+.eyebrow { color: var(--primary-dark); font-size: 12px; font-weight: 800; letter-spacing: .1em; margin-bottom: 10px; }
+.hero { padding: 28px 0; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.25; letter-spacing: -.04em; }
+.feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 24px 0; }
+.feature-grid > div { border-top: 2px solid var(--primary); padding: 14px 0; }
+.feature-grid b, .feature-grid span { display: block; font-size: 14px; line-height: 1.6; }
+.feature-grid span { color: var(--muted); margin-top: 6px; }
+.skill-tags, .condition-trail { display: flex; flex-wrap: wrap; gap: 8px; }
+.skill-tags span, .condition-trail span { background: #e8eef4; color: #30445a; border-radius: 6px; padding: 5px 9px; font-size: 12px; }
+.condition-trail { padding: 8px 16px; max-height: 88px; overflow-y: auto; flex-shrink: 0; }
+.review-focus { padding: 4px 18px 12px; background: #fff4e6; border-radius: var(--radius); margin-top: 18px; }
+.decision-timeline { list-style: none; padding: 0 0 0 16px; margin: 0; border-left: 2px solid var(--line); }
+.decision-timeline li { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; margin: 10px 0; }
+.decision-timeline li.wrong { border-left: 4px solid var(--danger); }
+.decision-timeline small, .decision-timeline p { color: var(--muted); font-size: 13px; }
+.decision-timeline blockquote { margin: 8px 0; line-height: 1.6; overflow-wrap: anywhere; }
+.decision-timeline p span { display: inline-block; margin-left: 10px; }
+.evidence-list { list-style: none; padding: 0; display: grid; gap: 8px; }
+.evidence-list li { border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: 13px; }
+.evidence-list blockquote { margin: 8px 0; color: var(--muted); overflow-wrap: anywhere; }
+.evidence-list a { display: inline-block; color: var(--primary-dark); margin: 8px 12px 0 0; }
+@media (max-width: 560px) {
+  .feature-grid { grid-template-columns: 1fr; gap: 0; }
+  .report-head { padding: 16px; gap: 8px; }
+  .report-emoji { display: none; }
+  .end-banner { font-size: 14px; }
+}
+
+.instructions { line-height: 1.9; padding-left: 24px; }
+.demo-note { background: #fff4e6; padding: 14px; border-radius: 10px; line-height: 1.6; }
+.mission-strip { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--line); }
+.mission-strip span { display: inline-block; color: var(--muted); margin-left: 12px; }
+.action-evidence { margin-top: 12px; padding: 12px; background: #f5f6f8; border-radius: 8px; font-size: 14px; }
+.action-evidence blockquote { margin: 8px 0 0; padding-left: 12px; border-left: 3px solid var(--primary); white-space: pre-wrap; overflow-wrap: anywhere; }
+button:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 button {
@@ -44,7 +79,7 @@ button.ghost { border: none; background: none; color: var(--muted); padding: 6px
 .error-box button { margin-left: 8px; padding: 4px 10px; }
 
 /* ---------- 시나리오 목록 ---------- */
-.hero h1 { font-size: 26px; margin: 0 0 6px; }
+.hero h1 { font-size: clamp(30px, 5vw, 46px); line-height: 1.25; letter-spacing: -.04em; margin: 0 0 14px; }
 .hero p { color: var(--muted); margin: 0 0 24px; }
 .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
 .scenario-card {

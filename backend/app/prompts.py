@@ -9,6 +9,7 @@ ai.py 는 '어떻게 부르는지(호출·재시도·검증)', 이 파일은 '�
 - 사용자 메시지: 이번 단계 대화 기록 + 이용자의 이번 입력(<user_input> 로 감쌈)
 """
 from __future__ import annotations
+import json
 
 # 판정 결과 JSON 형식. API 의 structured outputs 로 이 형식만 나오도록 강제한다.
 JUDGE_SCHEMA = {
@@ -42,6 +43,9 @@ def judge_system(scenario: dict, stage: dict, character: dict) -> str:
 # 지금 단계: {stage["stage"]}단계 「{stage["title"]}」
 - 눈앞의 상황: {stage["situation"]}
 - 이 단계에서 이용자가 해야 할 올바른 행동 (판정 기준, 이용자에게 절대 먼저 말하지 말 것): {stage["correct_action"]}
+- 확인할 세부 행동: {json.dumps([item['label'] for item in stage.get('rubric', [])], ensure_ascii=False)}
+- 서버가 확정한 이전 선택 상태: {json.dumps(stage.get('world_state', {}), ensure_ascii=False)}
+- 이전 선택 상태의 missed는 그 행동을 사용자가 완수하지 못하고 도움을 받았다는 뜻입니다. 이미 수행했다고 꾸며내지 마세요.
 
 # 판정 기준 (verdict)
 - "correct": 이용자가 올바른 행동의 핵심을 직접 하거나, 인물에게 그렇게 하자고 분명히 말했다.

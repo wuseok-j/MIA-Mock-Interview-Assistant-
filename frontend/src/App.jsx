@@ -2,6 +2,7 @@ import { useState } from "react";
 import ScenarioList from "./pages/ScenarioList.jsx";
 import Play from "./pages/Play.jsx";
 import Report from "./pages/Report.jsx";
+import Briefing from "./pages/Briefing.jsx";
 
 // 화면 3개를 상태값 하나로 전환한다. (라우터 라이브러리 없이 단순하게)
 //   list   → 시나리오 목록
@@ -19,7 +20,12 @@ export default function App() {
       </header>
 
       {screen.name === "list" && (
-        <ScenarioList onSelect={(scenario) => setScreen({ name: "play", scenario })} />
+        <ScenarioList onSelect={(scenario) => setScreen({ name: "briefing", scenario })} />
+      )}
+      {screen.name === "briefing" && (
+        <Briefing scenario={screen.scenario}
+          onStart={() => setScreen({ name: "play", scenario: screen.scenario })}
+          onBack={() => setScreen({ name: "list" })} />
       )}
       {screen.name === "play" && (
         <Play
