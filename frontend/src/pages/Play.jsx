@@ -86,8 +86,12 @@ export default function Play({ scenario, onFinish, onExit }) {
         </div>
       )}
 
+      <div className="mission-strip">{scenario.briefing?.mission || "동료와 안전하게 대피하기"}
+        {turn && <span>이번 단계 판단 기회 {turn.attempts_left}회</span>}
+      </div>
+      {!!turn?.conditions?.length && <div className="condition-trail" aria-label="이전 선택의 영향">{turn.conditions.map((label, i) => <span key={i}>{label}</span>)}</div>}
       {/* 채팅 */}
-      <div className="chat" ref={chatBox}>
+      <div className="chat" ref={chatBox} role="log" aria-label="상황과 대화" aria-live="polite">
         {messages.map((m, i) => <Bubble key={i} m={m} />)}
         {pending && <Bubble m={{ role: "user", name: "나", text: pending }} dim />}
         {pending && <div className="typing">상대가 반응하는 중…</div>}
@@ -101,13 +105,14 @@ export default function Play({ scenario, onFinish, onExit }) {
       {/* 입력창 또는 종료 배너 */}
       {ended ? (
         <div className={`end-banner ${turn.status}`}>
-          <span>{turn.status === "cleared" ? "🎉 대피 성공!" : "⚠️ 대피 실패"}</span>
+          <span>{turn.status === "cleared" ? "건물 밖 도착 · 판단을 복기하세요" : "대피 중단 · 판단을 복기하세요"}</span>
           <button className="primary" onClick={() => onFinish(turn.session_id)}>리포트 보기</button>
         </div>
       ) : (
         <form className="composer" onSubmit={send}>
           <input
             value={input}
+            aria-label="내가 할 행동"
             onChange={(e) => setInput(e.target.value.slice(0, MAX_LEN))}
             placeholder={turn ? "어떻게 행동할지 말해 보세요" : "준비 중…"}
             disabled={!turn || !!pending}

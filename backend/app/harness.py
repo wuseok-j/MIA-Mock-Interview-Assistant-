@@ -17,7 +17,7 @@ import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, safety
+from . import ai, safety, rules
 
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "data" / "scenarios"
 
@@ -53,6 +53,10 @@ class Session:
     stage_results: dict[int, str] = field(default_factory=dict)   # {단계번호: "correct" | "failed"}
     transcript: list[dict] = field(default_factory=list)          # {stage, role, name, text}
     blocked_count: int = 0                      # 안전 필터에 걸린 횟수 (리포트·로그용)
+    actions: dict[int, list[str]] = field(default_factory=dict)
+    evidence: dict[int, dict[str, str]] = field(default_factory=dict)
+    conditions: dict[str, str] = field(default_factory=dict)
+    timeline: list[dict] = field(default_factory=list)
     report: dict | None = None                  # 한 번 만든 리포트는 저장해서 재사용 (AI 재호출 방지)
 
 
@@ -63,7 +67,12 @@ SESSIONS: dict[str, Session] = {}
 # ---------- 조회 도우미 ----------
 
 def current_stage(s: Session) -> dict:
-    return s.scenario["stages"][s.stage_index]
+    base = s.scenario["stages"][s.stage_index]
+    for variant in base.get("variants", []):
+        when = variant["when"]
+        if s.conditions.get(when["key"]) == when["value"]:
+            return {**base, **{k: v for k, v in variant.items() if k != "when"}}
+    return base
 
 
 def character(s: Session, char_id: str) -> dict:
@@ -77,6 +86,7 @@ def public_scenario(sc: dict) -> dict:
         "category": sc["category"], "thumbnail": sc.get("thumbnail"),
         "estimated_minutes": sc.get("estimated_minutes"),
         "total_stages": len(sc["stages"]),
+        "briefing": sc.get("briefing", {}),
         "characters": [{"name": c["name"], "role": c["role"], "image": c.get("image")}
                        for c in sc["characters"]],
     }
@@ -93,6 +103,8 @@ def create_session(scenario_id: str) -> tuple[Session, list[dict]]:
 
 def handle_message(s: Session, text: str) -> list[dict]:
     """이용자 한 마디를 처리하고, 화면에 보여줄 메시지 목록을 돌려준다."""
+    if s.status != "playing":
+        return []
     st = current_stage(s)
     ch = character(s, st["character_id"])
     out: list[dict] = []
@@ -105,9 +117,19 @@ def handle_message(s: Session, text: str) -> list[dict]:
         _say(s, out, "system", "안내", safety.REDIRECT[flag])
         return out
 
+    s.actions.setdefault(st["stage"], []).append(text)
+
     # 2) AI 판정 제안
-    history = [t for t in s.transcript if t["stage"] == st["stage"]]
-    suggestion = ai.judge_action(s.scenario, st, ch, text, history)
+    history = [t for t in s.transcript if t["stage"] == st["stage"]
+               and not (t["role"] == "user" and safety.check(t["text"]))]
+    context = {**st, "world_state": dict(s.conditions)}
+    suggestion = ai.judge_action(s.scenario, context, ch, text, history)
+    if (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
+            or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str)):
+        # API 장애를 이용자의 판단 실패로 계산하지 않는다.
+        s.actions[st["stage"]].pop()
+        _say(s, out, "system", "안내", "응답을 확인하지 못했습니다. 판단 기회와 위험도는 유지됩니다. 잠시 후 다시 말해 주세요.")
+        return out
 
     # 3) 서버 검증 — 형식이 이상하면 안전한 기본값으로
     verdict = suggestion.get("verdict")
@@ -115,13 +137,32 @@ def handle_message(s: Session, text: str) -> list[dict]:
         verdict = "unclear"
     if verdict == "correct" and KEYWORD_GUARD and not _has_keyword(text, st["keywords"]):
         verdict = "unclear"
+    before_risk = s.risk
+    observed = rules.observe(st, text)
+    evidence = s.evidence.setdefault(st["stage"], {})
+    if rules.dangerous(st, text):
+        verdict = "wrong"
+    if st.get("rubric"):
+        if verdict == "wrong":
+            evidence.clear()
+        if verdict != "wrong":
+            for item_id in observed:
+                evidence[item_id] = text
+        complete = all(item["id"] in evidence for item in st["rubric"])
+        if verdict != "wrong":
+            verdict = "correct" if complete else "unclear"
     reply = str(suggestion.get("reply") or "").strip()[:MAX_REPLY_CHARS] or st["reactions"][verdict]
+    # AI가 통과를 제안했어도 서버 근거가 부족하면 성공 대사를 노출하지 않는다.
+    if verdict != suggestion.get("verdict"):
+        reply = st.get("partial_reply", st["reactions"][verdict]) if verdict == "unclear" else st["reactions"][verdict]
     _say(s, out, "character", ch["name"], reply)
 
     # 4) 서버 규칙으로 진행 결정
     s.turns_in_stage += 1
     if verdict == "correct":
         s.stage_results[st["stage"]] = "correct"
+        _record(s, st, text, verdict, before_risk, "단계 행동 확인")
+        _consequence(s, st, True, out)
         out += _go_next(s, st["next_if_correct"])
         return out
 
@@ -132,20 +173,42 @@ def handle_message(s: Session, text: str) -> list[dict]:
     if s.risk >= s.scenario["max_risk"]:
         s.stage_results[st["stage"]] = "failed"
         s.status = "failed"
+        _record(s, st, text, verdict, before_risk, "위험도 한도로 종료")
         _say(s, out, "system", "결과",
              "위험도가 한계를 넘었습니다. 구조대에 의해 구조되었지만 대피에는 실패했어요. 리포트에서 어떤 판단이 필요했는지 확인해 보세요.")
     elif s.turns_in_stage >= MAX_TURNS_PER_STAGE:
         s.stage_results[st["stage"]] = "failed"
-        _say(s, out, "narrator", "상황", "판단이 늦어지는 사이 상황이 다음으로 흘러갑니다.")
+        _record(s, st, text, verdict, before_risk, "판단 기회 소진 · 도움받아 이동")
+        _consequence(s, st, False, out)
         out += _go_next(s, st["next_if_correct"])
+    else:
+        _record(s, st, text, verdict, before_risk, "위험 행동" if verdict == "wrong" else "행동 추가 확인 필요")
     return out
+
+
+def _record(s: Session, st: dict, text: str, verdict: str, before: int, outcome: str) -> None:
+    s.timeline.append({"stage": st["stage"], "title": st["title"], "action": text,
+                       "verdict": verdict, "risk_before": before, "risk_after": s.risk,
+                       "outcome": outcome})
+
+
+def _consequence(s: Session, st: dict, success: bool, out: list[dict]) -> None:
+    effect = st.get("consequence")
+    if effect:
+        s.conditions[effect["key"]] = "success" if success else "missed"
+        _say(s, out, "narrator", "선택의 결과", effect["success" if success else "missed"])
+
+
+def public_conditions(s: Session) -> list[str]:
+    return [st["consequence"]["success_label" if s.conditions[st["consequence"]["key"]] == "success" else "missed_label"]
+            for st in s.scenario["stages"] if st.get("consequence", {}).get("key") in s.conditions]
 
 
 def _go_next(s: Session, next_stage: int | None) -> list[dict]:
     if next_stage is None:
         s.status = "cleared"
         out: list[dict] = []
-        _say(s, out, "system", "결과", "무사히 대피를 마쳤습니다! 리포트에서 단계별 판단을 확인해 보세요.")
+        _say(s, out, "system", "결과", "건물 밖에서 플레이를 마쳤습니다. 대피 결과와 별개로, 리포트에서 확인된 행동과 도움받은 판단을 살펴보세요.")
         return out
     s.stage_index = next(i for i, x in enumerate(s.scenario["stages"]) if x["stage"] == next_stage)
     s.turns_in_stage = 0
@@ -194,6 +257,14 @@ def build_report(s: Session) -> dict:
             "result": results[ev["stage"]],          # correct | failed | not_reached
             "correct_action": st["correct_action"],  # 리포트에서는 정답 공개 (학습용)
             "comment": str(comments.get(ev["id"], ""))[:MAX_REPLY_CHARS],
+            "user_actions": s.actions.get(ev["stage"], []),
+            "attempts": len(s.actions.get(ev["stage"], [])),
+            "evidence": [{"id": item["id"], "label": item["label"],
+                          "met": item["id"] in s.evidence.get(st["stage"], {}),
+                          "quote": s.evidence.get(st["stage"], {}).get(item["id"], ""),
+                          "sources": [{"name": sc["sources"][i]["name"], "url": sc["sources"][i]["url"]}
+                                      for i in item.get("source_indices", [])]}
+                         for item in st.get("rubric", [])],
         })
 
     s.report = {
@@ -204,7 +275,10 @@ def build_report(s: Session) -> dict:
         "max_risk": sc["max_risk"],
         "passed": sum(c["result"] == "correct" for c in checks),
         "total": len(checks),
-        "summary": str(ai_text.get("summary", ""))[:600],
+        "summary": "대피 결과와 행동 충족도는 별개입니다. 확인된 발언 근거를 바탕으로 놓친 행동을 복기하세요. 자동 판정은 표현을 놓칠 수 있으며 안전 역량 인증이 아닙니다.",
+        "timeline": s.timeline,
+        "conditions": public_conditions(s),
+        "review_points": [c["stage_title"] for c in checks if c["result"] != "correct"],
         "checks": checks,
         "sources": [{"name": x["name"], "url": x["url"]} for x in sc.get("sources", [])],
     }

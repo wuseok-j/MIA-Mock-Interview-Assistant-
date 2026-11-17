@@ -22,7 +22,7 @@
 | 위치 | 내용 |
 |---|---|
 | `backend/app/harness.py` | 하네스: 단계 진행·위험도·판정 검증 (핵심) |
-| `backend/app/ai.py` | AI 호출 (지금은 가짜 AI, 실제 호출로 교체 예정) |
+| `backend/app/ai.py` | 행동 판정 API 호출 (키 없으면 mock), 종료 코멘트는 고정 응답 |
 | `backend/app/safety.py` | 인젝션·부적절 표현 1차 필터 |
 | `backend/app/main.py`, `schemas.py` | API 서버, 요청·응답 형식 |
 | `backend/play_test.py` | 시나리오 자동 플레이 테스트 |
@@ -31,13 +31,20 @@
 | `docs/research/` | 유사 서비스·시장 조사 |
 | `docs/tasks/` | **팀원별 할 일** |
 | `frontend/` | React 웹 프로토타입 (목록 → 플레이 → 리포트) |
+| `docs/decision-design.md` | 다중 행동 근거·선택 상태·판단 복기 설계와 한계 |
+
+## 선택이 남는 플레이
+
+목록 → 임무 브리핑 → 채팅 → 판단 복기로 진행한다. 서버가 필수 행동을 항목별로 확인하며, 여러 발언에 걸쳐 근거를 모을 수 있다. 단계에서 도움을 받았는지에 따라 다음 장면이 바뀐다. 리포트는 실제 발언, 위험도 변화, 충족·미확인 행동과 출처를 보여준다. 건물 밖 도착 여부와 행동 충족도는 별개다.
+
+`backend/decision_test.py`에서 AI의 잘못된 성공 제안, 부분 행동, 도움 경로, 장애 시 기회 보존 등을 API 키 없이 검증한다. 표현 판정은 제한된 패턴 기반이며 의미 이해나 안전 역량 인증을 대체하지 않는다.
 
 ## 처음 받았을 때
 
 ```bash
 git clone https://github.com/wuseok-j/MIA-Mock-Interview-Assistant-.git
 cd MIA-Mock-Interview-Assistant-
-cp .env.example .env          # .env 에 API 키 입력 (Windows: copy .env.example .env)
+cp .env.example .env          # .env 의 GEMINI_API_KEY 에 키 입력 (Windows: copy .env.example .env)
 
 cd backend
 python -m venv .venv
@@ -77,6 +84,10 @@ http://localhost:5173 → 시나리오 선택 → 채팅 플레이 → 리포트
 python first_run.py
 ```
 캐릭터 대사 1개와 토큰 사용량·예상 비용이 출력되면 성공.
+
+Gemini 설정은 루트 `.env`의 `LLM_PROVIDER=gemini`, `GEMINI_API_KEY`, `LLM_MODEL_FAST`를 사용한다. 연결 확인 모델은 `gemini-3.1-flash-lite`다. 키 없이 실행하거나 `LLM_PROVIDER=mock`이면 오프라인 판정을 사용한다. `LLM_API_KEY`는 더 이상 사용하지 않는다. 종료 평가 코멘트는 여전히 고정 문구다.
+
+가격 변수가 0이면 비용 미설정이다. 무료라는 뜻이 아니며, `first_run.py`는 가격을 설정했을 때만 예상 비용을 계산한다. 사용 가능 모델 조회는 `python model_check.py`로 실행한다.
 
 ## 협업 규칙
 

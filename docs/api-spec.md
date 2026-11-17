@@ -1,10 +1,10 @@
-# API 명세 v0.2 (재난·안전 롤플레잉)
+# API 명세 v0.4 (재난·안전 롤플레잉)
 
 기본 주소: `http://localhost:8000`
 서버 실행 후 `http://localhost:8000/docs` 에서 직접 눌러 볼 수 있다.
 형식을 바꿀 때는 이 문서와 `backend/app/schemas.py` 를 함께 수정하고 팀에 공유한다.
 
-화면 흐름: **① 시나리오 목록 → ② 채팅 플레이 → ③ 종료 리포트**
+화면 흐름: **① 시나리오 목록 → ② 임무 브리핑 → ③ 채팅 플레이 → ④ 판단 복기**
 
 ---
 
@@ -114,3 +114,31 @@
 | 404 | 없는 시나리오·세션 id | 시나리오 목록으로 이동 |
 | 422 | 빈 입력, 300자 초과 | 입력창 아래 안내 문구 |
 | 500·502 | 서버·AI 오류 | '다시 시도' 버튼 (입력한 문장 유지) |
+
+## v0.3 추가 필드
+
+- 리포트 checks에 `user_actions: list[str]`(해당 단계 실제 발언), `attempts: int`(필터 통과 후 판단 시도 수)를 추가한다. 차단 입력은 발언 근거에서 제외한다.
+- 화면 흐름은 목록 → 브리핑 → 플레이 → 리포트다. 브리핑 확인 전에는 세션을 생성하지 않는다.
+- 자동 판정의 근거를 표시하며 안전 역량 인증으로 표현하지 않는다.
+
+## v0.4 선택의 영향과 근거 기반 복기
+
+기존 필드는 유지하며 아래 필드를 추가한다.
+
+| 응답 | 필드 | 의미 |
+|---|---|---|
+| ScenarioSummary | `briefing: {role, mission, focus}` | 공개 가능한 역할·목표·연습 역량. 판정 정규식은 비공개 |
+| Turn | `conditions: string[]` | 앞선 단계의 확인·도움 이력 표시 |
+| Turn | `attempts_left: int` | 현재 단계의 남은 판단 기회, 종료 시 0 |
+| CheckResult | `evidence: Evidence[]` | 행동 항목별 확인 여부·실제 발언·근거 출처 |
+| Report | `timeline: Decision[]` | 평가된 입력별 판정·위험도 변화·결과 |
+| Report | `conditions: string[]` | 최종 선택 이력 |
+| Report | `review_points: string[]` | 미충족·미도달 단계 제목 |
+
+`Evidence`: `{id, label, met: bool, quote: string, sources: [{name, url}]}`. 미확인 quote는 빈 문자열이다.
+
+`Decision`: `{stage, title, action, verdict, risk_before, risk_after, outcome}`. verdict는 기존 correct/wrong/unclear다. 입력 차단과 AI 장애는 타임라인과 판단 횟수에서 제외한다.
+
+여러 발언에서 확인한 행동을 단계별로 누적한다. 위험 행동이 판정되면 그 단계의 근거를 초기화하고 위험도를 올린다. 모든 필수 행동을 확인해야 통과하며, 기회가 소진되면 실패 기록과 도움받는 전개를 남긴다. `cleared`는 건물 밖 도착을 의미하며 모든 행동 통과를 뜻하지 않는다.
+
+현재는 JSON의 제한된 표현 패턴으로 근거를 검증한다. 미등록 표현·복잡한 부정·인용은 오판할 수 있다. 상세 한계와 시연 방법은 [설계 문서](decision-design.md)를 따른다.

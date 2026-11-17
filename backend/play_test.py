@@ -6,10 +6,12 @@
   3) 위험한 플레이 → 위험도 한계로 failed
 """
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 
 from app.main import app
 
 client = TestClient(app)
+patch("app.ai._api_key", return_value=None).start()  # 자동 테스트는 비용 없이 결정적으로 실행
 SCENARIO = "fire_office"
 
 

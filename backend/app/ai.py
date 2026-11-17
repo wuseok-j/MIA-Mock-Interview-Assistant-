@@ -1,109 +1,28 @@
-"""AI 호출 모음 (담당: 김채희).
+"""Gemini action adapter; deterministic report comments.
 
-서버(harness.py)는 이 파일의 함수 2개만 부른다.
-함수 이름·입력·반환 형식은 팀 합의 사항이므로, 바꿀 때는 장우석과 먼저 이야기한다.
-
-judge_action 은 실제 API 를 호출한다. (.env 에 LLM_API_KEY 가 없으면 키워드 기반 가짜 AI 로 동작)
-evaluate 는 아직 가짜 응답이다. (4주차에 상위 모델로 교체)
-
-실제 호출로 바꿀 때 지킬 것
-- 진행(judge_action): 경량 모델 LLM_MODEL_FAST / 리포트(evaluate): 상위 모델 LLM_MODEL_SMART
-- 프롬프트 문장은 prompts.py 에 따로 둔다.
-- 시스템 프롬프트에 role_doc·캐릭터·현재 단계(correct_action 포함)를 넣고, 이 부분은 프롬프트 캐싱 대상.
-- 이용자 입력은 <user_input> ... </user_input> 로 감싸 "판정할 데이터"로만 취급하라고 지시한다.
-- 출력은 JSON 하나만. 파싱 실패 → 1회 재요청 → 그래도 실패하면 아래 fallback 반환.
-- 매 호출의 res.usage (입력·출력 토큰)를 기록할 수 있게 남겨 둔다. (기록 위치는 장우석과 상의)
-- 판정이 틀려도 서버가 형식·키워드로 한 번 더 검사하니, 여기서는 '자연스러운 대사'와 '정직한 판정'에 집중.
+No key (or LLM_PROVIDER=mock) keeps offline playback available.
+The harness owns progression, risk, evidence and results.
 """
 from __future__ import annotations
-
-import json
-import logging
 import os
-import time
 from pathlib import Path
-
-import anthropic
 from dotenv import load_dotenv
-
-from . import prompts
+from . import gemini
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
-log = logging.getLogger("mia.ai")
-logging.basicConfig(level=logging.INFO, format="%(message)s")
-
-MODEL_FAST = os.getenv("LLM_MODEL_FAST", "claude-haiku-5-5")
-FALLBACK_JUDGE = {"verdict": "unclear", "reply": "", "reason": "fallback"}
-
-_client: anthropic.Anthropic | None = None
 
 
-def _api_key() -> str | None:
-    key = os.getenv("LLM_API_KEY", "").strip()
-    return key if key and not key.startswith("여기에") else None
+def _api_key():
+    return gemini.api_key() if os.getenv("LLM_PROVIDER", "gemini").strip().lower() == "gemini" else None
 
 
-def _get_client() -> anthropic.Anthropic:
-    global _client
-    if _client is None:
-        # max_retries=1: 네트워크 오류·429·5xx 는 SDK 가 1회 자동 재시도한다. (팀 규칙: API 오류 1회 재시도)
-        _client = anthropic.Anthropic(api_key=_api_key(), max_retries=1, timeout=30.0)
-    return _client
-
-
-def judge_action(scenario: dict, stage: dict, character: dict,
-                 user_text: str, history: list[dict]) -> dict:
-    """(아래 _mock_judge_action 과 같은 계약) 이용자 행동 판정 + 캐릭터 대사.
-
-    API 키가 없으면 키워드 기반 가짜 AI 로 동작한다. (키 없는 팀원도 play_test 가 돌도록)
-    """
+def judge_action(scenario, stage, character, user_text, history):
+    provider = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+    if provider not in ("gemini", "mock"):
+        return dict(gemini.FALLBACK)
     if not _api_key():
         return _mock_judge_action(scenario, stage, character, user_text, history)
-
-    system = prompts.judge_system(scenario, stage, character)
-    user = prompts.judge_user(history, user_text)
-
-    # JSON 형식 오류·빈 응답이면 1회 재요청, 두 번 다 실패하면 fallback.
-    for attempt in (1, 2):
-        try:
-            start = time.time()
-            res = _get_client().messages.create(
-                model=MODEL_FAST,
-                max_tokens=2000,
-                system=system,
-                messages=[{"role": "user", "content": user}],
-                # 대화형·빠른 응답이 중요하므로 생각(thinking) 깊이를 낮게.
-                output_config={
-                    "effort": "low",
-                    "format": {"type": "json_schema", "schema": prompts.JUDGE_SCHEMA},
-                },
-            )
-            elapsed = time.time() - start
-        except anthropic.APIError as e:
-            # SDK 재시도까지 실패한 API 오류 (키 오류·잘못된 모델 이름 포함). 같은 요청을 또 보내도 소용없다.
-            log.warning("[ai] judge_action API 오류: %s", e)
-            return dict(FALLBACK_JUDGE)
-
-        # 토큰 사용량 기록 (어디에 저장할지는 장우석·조민선과 상의 → 지금은 서버 로그에만)
-        u = res.usage
-        log.info("[ai] judge_action model=%s %.2fs in=%s out=%s stop=%s",
-                 MODEL_FAST, elapsed, u.input_tokens, u.output_tokens, res.stop_reason)
-
-        if res.stop_reason == "refusal":
-            log.warning("[ai] 모델이 응답을 거절함 → fallback")
-            return dict(FALLBACK_JUDGE)
-
-        try:
-            text = next(b.text for b in res.content if b.type == "text")
-            data = json.loads(text)
-            if data.get("verdict") in ("correct", "wrong", "unclear") and isinstance(data.get("reply"), str):
-                return {"verdict": data["verdict"], "reply": data["reply"].strip(),
-                        "reason": str(data.get("reason", ""))}
-        except (StopIteration, json.JSONDecodeError):
-            pass
-        log.warning("[ai] 응답 형식 오류 (시도 %d/2)", attempt)
-
-    return dict(FALLBACK_JUDGE)
+    return gemini.judge(scenario, stage, character, user_text, history)
 
 
 def _mock_judge_action(scenario: dict, stage: dict, character: dict,
@@ -152,13 +71,13 @@ def evaluate(scenario: dict, results: dict[int, str], transcript: list[dict]) ->
     for ev in scenario["evaluation"]:
         r = results.get(ev["stage"])
         if r == "correct":
-            comments[ev["id"]] = "(가짜 데이터) 올바르게 판단했어요. 실제 상황에서도 이렇게 행동하면 됩니다."
+            comments[ev["id"]] = "서버의 행동 기준이 충족되었습니다. 항목별 발언 근거를 확인해 보세요."
         elif r == "failed":
-            comments[ev["id"]] = "(가짜 데이터) 이 단계에서 판단이 늦거나 위험한 선택을 했어요. 아래 올바른 행동을 확인해 보세요."
+            comments[ev["id"]] = "시도 횟수 또는 위험도 한도에 도달했습니다. 행동 기준을 확인하고 다시 연습해 보세요."
         else:
-            comments[ev["id"]] = "(가짜 데이터) 이 단계까지 도달하지 못했어요."
+            comments[ev["id"]] = "플레이가 먼저 종료되어 이 단계는 평가하지 않았습니다."
     passed = sum(r == "correct" for r in results.values())
     return {
-        "summary": f"(가짜 데이터) {len(results)}단계 중 {passed}단계에서 올바르게 판단했습니다.",
+        "summary": f"{len(results)}단계 중 {passed}단계가 규칙 기반 판정을 통과했습니다. 키워드 일치에 따른 연습 기록이며 실제 안전 역량을 인증하지 않습니다.",
         "comments": comments,
     }

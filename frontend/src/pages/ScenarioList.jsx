@@ -15,8 +15,14 @@ export default function ScenarioList({ onSelect }) {
   return (
     <main className="page">
       <section className="hero">
-        <h1>실제 상황처럼, 직접 판단해 보세요</h1>
-        <p>재난 상황 속 인물과 대화하며 행동을 결정하고, 끝나면 단계별 피드백을 받습니다.</p>
+        <div className="eyebrow">MIA · DECISION LAB</div>
+        <h1>당신의 한마디가,<br />다음 상황을 바꿉니다.</h1>
+        <p>동료를 설득하고, 경로를 판단하고, 내 선택의 근거를 복기하는 재난 대응 연습.</p>
+        <div className="feature-grid">
+          <div><b>01 · 선택이 남는 상황</b><span>앞선 판단이 다음 장면에 반영됩니다.</span></div>
+          <div><b>02 · 행동 단위 확인</b><span>단어 하나 대신 필요한 행동을 모읍니다.</span></div>
+          <div><b>03 · 근거로 돌아보기</b><span>내 발언과 행동 기준을 나란히 봅니다.</span></div>
+        </div>
       </section>
 
       {error && (
@@ -39,7 +45,7 @@ export default function ScenarioList({ onSelect }) {
                 {sc.estimated_minutes && <li>약 {sc.estimated_minutes}분</li>}
                 <li>등장인물 {sc.characters.map((c) => c.name).join(", ")}</li>
               </ul>
-              <button className="primary" onClick={() => onSelect(sc)}>시작하기</button>
+              <button className="primary" onClick={() => onSelect(sc)}>임무 확인하기 →</button>
             </div>
           </article>
         ))}
