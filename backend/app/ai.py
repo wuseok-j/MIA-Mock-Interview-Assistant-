@@ -36,6 +36,7 @@ def _mock_judge_action(scenario: dict, stage: dict, character: dict,
     history:   이번 단계에서 오간 대화 [{"role": "narrator"|"character"|"user"|"system", "name", "text"}]
 
     반환: {"verdict": "correct" | "wrong" | "unclear",
+           "intent":  "action" | "question" | "chat"  (질문·대화는 판단 기회를 쓰지 않음. 서버가 최종 결정),
            "reply":   캐릭터 대사 (1~2문장, 캐릭터 말투),
            "reason":  판정 이유 한 줄 (로그·디버깅용, 화면에 안 나감)}
       - correct: correct_action 의 핵심을 실행하거나 제안함
@@ -52,7 +53,12 @@ def _mock_judge_action(scenario: dict, stage: dict, character: dict,
         verdict = "wrong"
     else:
         verdict = "unclear"
-    return {"verdict": verdict, "reply": stage["reactions"][verdict], "reason": "mock: keyword match"}
+    # 가짜 AI의 말 종류 분류: 물음표로 끝나면 질문, 아니면 행동 시도로 본다.
+    intent = "question" if verdict == "unclear" and user_text.strip().endswith(("?", "？")) else "action"
+    reply = stage["reactions"][verdict]
+    if intent == "question":
+        reply = stage.get("question_reply", "지금 그런 거 따질 때야? 빨리 어떻게 할지 정해!")
+    return {"verdict": verdict, "intent": intent, "reply": reply, "reason": "mock: keyword match"}
 
 
 def evaluate(scenario: dict, results: dict[int, str], transcript: list[dict]) -> dict:

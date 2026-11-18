@@ -22,7 +22,11 @@ from . import ai, safety, rules
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "data" / "scenarios"
 
 MAX_TURNS_PER_STAGE = 3   # 한 단계에서 판단할 기회. 다 쓰면 서버가 '실패'로 기록하고 다음 단계로 넘긴다.
+# 질문·대화는 판단 기회를 쓰지 않는다 (롤플레잉 자유도). 대신 단계당 횟수에 상한을 둔다 (토큰 비용 보호).
+# 상한을 넘으면 그 뒤의 말은 모두 판단 시도로 센다.
+MAX_FREE_TURNS_PER_STAGE = 6
 VERDICTS = {"correct", "wrong", "unclear"}
+INTENTS = {"action", "question", "chat"}
 MAX_REPLY_CHARS = 300     # 모델 대사가 너무 길면 자른다.
 
 # 키워드 가드: 모델이 correct 라고 해도, 이용자 입력에 그 단계의 행동 키워드가 하나도 없으면 인정하지 않는다.
@@ -49,7 +53,8 @@ class Session:
     stage_index: int = 0
     risk: int = 0
     turns_in_stage: int = 0
-    status: str = "playing"                     # playing | cleared | failed
+    free_turns_in_stage: int = 0                # 이번 단계에서 판단 기회를 쓰지 않은 질문·대화 수
+    status: str = "playing"                    # playing | cleared | failed
     stage_results: dict[int, str] = field(default_factory=dict)   # {단계번호: "correct" | "failed"}
     transcript: list[dict] = field(default_factory=list)          # {stage, role, name, text}
     blocked_count: int = 0                      # 안전 필터에 걸린 횟수 (리포트·로그용)
@@ -122,8 +127,7 @@ def handle_message(s: Session, text: str) -> list[dict]:
     # 2) AI 판정 제안
     history = [t for t in s.transcript if t["stage"] == st["stage"]
                and not (t["role"] == "user" and safety.check(t["text"]))]
-    context = {**st, "world_state": dict(s.conditions)}
-    suggestion = ai.judge_action(s.scenario, context, ch, text, history)
+    suggestion = ai.judge_action(s.scenario, _ai_context(s, st), ch, text, history)
     if (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
             or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str)):
         # API 장애를 이용자의 판단 실패로 계산하지 않는다.
@@ -157,7 +161,17 @@ def handle_message(s: Session, text: str) -> list[dict]:
         reply = st.get("partial_reply", st["reactions"][verdict]) if verdict == "unclear" else st["reactions"][verdict]
     _say(s, out, "character", ch["name"], reply)
 
-    # 4) 서버 규칙으로 진행 결정
+    # 4) 판단 시도인지, 질문·대화인지 — 서버가 최종 결정
+    #    AI의 intent 는 '기회를 덜 쓰게' 만들 수만 있다. 근거·위험 행동이 잡히면 AI 분류와 무관하게 시도로 센다.
+    intent = suggestion.get("intent") if suggestion.get("intent") in INTENTS else "action"
+    is_attempt = (verdict != "unclear" or bool(observed) or intent == "action"
+                  or s.free_turns_in_stage >= MAX_FREE_TURNS_PER_STAGE)
+    if not is_attempt:
+        s.free_turns_in_stage += 1
+        s.actions[st["stage"]].pop()   # 리포트의 '판단 기록'에는 넣지 않는다 (대화 기록에는 남음)
+        return out
+
+    # 5) 서버 규칙으로 진행 결정
     s.turns_in_stage += 1
     if verdict == "correct":
         s.stage_results[st["stage"]] = "correct"
@@ -212,7 +226,33 @@ def _go_next(s: Session, next_stage: int | None) -> list[dict]:
         return out
     s.stage_index = next(i for i, x in enumerate(s.scenario["stages"]) if x["stage"] == next_stage)
     s.turns_in_stage = 0
+    s.free_turns_in_stage = 0
     return _enter_stage(s)
+
+
+def _ai_context(s: Session, st: dict) -> dict:
+    """AI에게 넘길 현재 단계 정보. 진행 결정에는 쓰지 않고, 자연스러운 대사를 위한 재료만 준다.
+
+    - world_facts: 질문에 일관되게 답하기 위한 상황 정보 (시나리오 공통 + 이 단계)
+    - confirmed/missing_actions: 이번 단계에서 이미 확인된 행동과 아직 남은 행동
+      → 일부만 맞았을 때 AI가 고정 문장 대신 자연스럽게 재촉한다. (정답을 직접 말하지는 않게 프롬프트로 제한)
+    - story_so_far: 지난 단계에서 일어난 일 → 대화가 단계마다 끊기지 않게
+    """
+    done = s.evidence.get(st["stage"], {})
+    rubric = st.get("rubric", [])
+    story = []
+    for prev in s.scenario["stages"][:s.stage_index]:
+        result = s.stage_results.get(prev["stage"])
+        story.append(f'{prev["stage"]}단계 「{prev["title"]}」: '
+                     + ("이용자가 직접 해냄" if result == "correct" else "이용자가 놓쳐서 다른 사람의 도움을 받음"))
+    return {
+        **st,
+        "world_state": dict(s.conditions),
+        "world_facts": list(s.scenario.get("role_doc", {}).get("world_facts", [])) + list(st.get("facts", [])),
+        "confirmed_actions": [item["label"] for item in rubric if item["id"] in done],
+        "missing_actions": [item["label"] for item in rubric if item["id"] not in done],
+        "story_so_far": story,
+    }
 
 
 def _enter_stage(s: Session) -> list[dict]:

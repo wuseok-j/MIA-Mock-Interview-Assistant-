@@ -87,7 +87,7 @@ export default function Play({ scenario, onFinish, onExit }) {
       )}
 
       <div className="mission-strip">{scenario.briefing?.mission || "동료와 안전하게 대피하기"}
-        {turn && <span>이번 단계 판단 기회 {turn.attempts_left}회</span>}
+        {turn && <span>행동 시도 기회 {turn.attempts_left}회 · 질문은 자유</span>}
       </div>
       {!!turn?.conditions?.length && <div className="condition-trail" aria-label="이전 선택의 영향">{turn.conditions.map((label, i) => <span key={i}>{label}</span>)}</div>}
       {/* 채팅 */}
@@ -114,7 +114,7 @@ export default function Play({ scenario, onFinish, onExit }) {
             value={input}
             aria-label="내가 할 행동"
             onChange={(e) => setInput(e.target.value.slice(0, MAX_LEN))}
-            placeholder={turn ? "어떻게 행동할지 말해 보세요" : "준비 중…"}
+            placeholder={turn ? "행동을 말하거나, 궁금한 걸 물어보세요" : "준비 중…"}
             disabled={!turn || !!pending}
             autoFocus
           />

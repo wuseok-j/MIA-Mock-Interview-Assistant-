@@ -134,6 +134,73 @@ class DecisionTests(unittest.TestCase):
         self.assertEqual(other.conditions, {})
         self.assertEqual(other.evidence, {})
 
+    # ---------- 대화 자유도: 질문·대화는 판단 기회를 쓰지 않는다 ----------
+
+    def ai(self, verdict='unclear', intent='question', reply='탕비실 입구 옆에 있어!'):
+        out = {'verdict': verdict, 'reply': reply, 'reason': 'test'}
+        if intent is not None:
+            out['intent'] = intent
+        return patch('app.ai.judge_action', return_value=out)
+
+    def test_question_does_not_consume_attempt(self):
+        with self.ai():
+            messages = self.say('소화기 어디 있어?')
+        self.assertEqual(self.session.turns_in_stage, 0)
+        self.assertEqual(self.session.free_turns_in_stage, 1)
+        self.assertEqual(self.session.timeline, [])
+        self.assertEqual(self.session.actions[1], [])
+        self.assertIn('탕비실 입구 옆에 있어!', str(messages))   # 대사는 그대로 나간다
+
+    def test_observed_action_counts_even_if_ai_calls_it_question(self):
+        with self.ai():
+            self.say('불났어요! 소화기 어디 있어요')
+        self.assertEqual(self.session.turns_in_stage, 1)
+        self.assertEqual(set(self.session.evidence[1]), {'warn'})
+
+    def test_ai_intent_cannot_hide_wrong_choice(self):
+        with self.ai(verdict='wrong', intent='chat', reply='그래 같이 기다리자'):
+            self.say('좀 더 지켜보자')
+        self.assertEqual(self.session.turns_in_stage, 1)
+        self.assertGreater(self.session.risk, 0)
+
+    def test_missing_or_invalid_intent_counts_as_attempt(self):
+        for intent in (None, 'skip_stage'):
+            with self.ai(intent=intent, reply='음?'):
+                self.say('흠')
+        self.assertEqual(self.session.turns_in_stage, 2)
+
+    def test_free_turns_have_a_cap(self):
+        for _ in range(harness.MAX_FREE_TURNS_PER_STAGE):
+            with self.ai():
+                self.say('그게 어디야?')
+        self.assertEqual(self.session.turns_in_stage, 0)
+        with self.ai():
+            self.say('그게 어디야?')
+        self.assertEqual(self.session.turns_in_stage, 1)
+
+    def test_free_turns_reset_on_next_stage(self):
+        with self.ai():
+            self.say('소화기 어디 있어?')
+        self.say('불이야! 119에 신고할게요')
+        self.assertEqual(self.session.stage_index, 1)
+        self.assertEqual(self.session.free_turns_in_stage, 0)
+
+    def test_ai_gets_progress_facts_and_story(self):
+        self.say('불이야!')
+        with patch('app.ai.judge_action', wraps=harness.ai.judge_action) as judge:
+            self.say('그 다음엔 뭐 하지')
+        stage = judge.call_args.args[1]
+        self.assertEqual(stage['confirmed_actions'], ['주변에 화재 사실 알리기'])
+        self.assertEqual(stage['missing_actions'], ['비상벨 또는 119 신고'])
+        self.assertTrue(any('소화기' in f for f in stage['world_facts']))
+        self.assertEqual(stage['story_so_far'], [])
+        self.say('119에 신고할게요')
+        with patch('app.ai.judge_action', wraps=harness.ai.judge_action) as judge:
+            self.say('엘리베이터 몇 대야?')
+        stage = judge.call_args.args[1]
+        self.assertIn('직접 해냄', stage['story_so_far'][0])
+        self.assertTrue(any('엘리베이터 2대' in f for f in stage['world_facts']))
+
     def test_reentry_warning_is_not_dangerous_but_conflicting_action_is(self):
         st = self.session.scenario['stages'][4]
         self.assertFalse(rules.dangerous(st, '노트북 가지러 들어가지 마'))
