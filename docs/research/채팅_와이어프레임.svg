@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="1120" viewBox="0 0 1440 1120">
+<rect width="1440" height="1120" fill="#f3f4f6"/>
+<text x="64" y="30" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#68707c">MIA / 재난·안전 대응 롤플레잉</text>
+<text x="64" y="64" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="32" fill="#202630">채팅 플레이 와이어프레임</text>
+<text x="64" y="112" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#68707c">데스크톱 웹 · 2단계 진입 직후 · 수정안 v2 / 팀 검토 전</text>
+<rect x="64" y="158" width="1312" height="850" rx="8" fill="#ffffff" stroke="#c7cbd1"/>
+<rect x="88" y="180" width="104" height="40" rx="8" fill="#f5f6f8" stroke="#c7cbd1"/>
+<text x="104" y="188" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">← 목록</text>
+<text x="216" y="184" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="24" fill="#202630">오피스 화재 대피</text>
+<text x="1110" y="192" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">교육용 상황 연습</text>
+<text x="96" y="242" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">내 역할  7층 사무실 직원</text>
+<text x="96" y="272" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="21" fill="#202630">임무  동료와 함께 대피하고, 건물 밖에서 소방대에 상황 전달하기</text>
+<line x1="64" y1="316" x2="1376" y2="316" stroke="#d3d6dc"/>
+<text x="96" y="336" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">현재 단계</text>
+<text x="96" y="365" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" fill="#202630">2 / 5 · 엘리베이터 앞</text>
+<text x="446" y="371" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">1 완료  /  2 현재  /  3–5 대기</text>
+<text x="858" y="336" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">위험도</text>
+<text x="1242" y="336" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" fill="#202630">0 / 6</text>
+<rect x="858" y="374" width="450" height="12" rx="5" fill="#eceef1" stroke="#c7cbd1"/>
+<text x="858" y="402" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" fill="#68707c">한도 도달 시 대피 중단 · 변화는 숫자로도 표시</text>
+<rect x="96" y="410" width="570" height="40" rx="8" fill="#f5f6f8" stroke="#c7cbd1"/>
+<text x="110" y="419" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" fill="#202630">이전 선택의 영향  ·  주변 알림 완료</text>
+<line x1="64" y1="470" x2="1376" y2="470" stroke="#d3d6dc"/>
+<line x1="580" y1="470" x2="580" y2="1008" stroke="#d3d6dc"/>
+<text x="96" y="490" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#68707c">현재 장면</text>
+<rect x="96" y="526" width="452" height="230" rx="8" fill="#eceef1" stroke="#c7cbd1"/>
+<line x1="108" y1="538" x2="536" y2="744" stroke="#d3d6dc"/>
+<line x1="536" y1="538" x2="108" y2="744" stroke="#d3d6dc"/>
+<rect x="200" y="614" width="244" height="46" rx="8" fill="#f4f5f7" stroke="#c7cbd1"/>
+<text x="222" y="624" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="22" fill="#202630">장면 이미지 영역</text>
+<text x="96" y="780" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="23" fill="#202630">엘리베이터 앞</text>
+<text x="96" y="826" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">비상벨이 울리고 사람들이 복도로 나온다.</text>
+<text x="96" y="857" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">복도 천장에 연기가 얇게 깔렸다.</text>
+<text x="96" y="888" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">박지훈이 엘리베이터 버튼을 연타한다.</text>
+<text x="96" y="948" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" fill="#68707c">이미지 미제공 시에도 제목·상황 설명 유지</text>
+<text x="612" y="490" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#68707c">대화 이력</text>
+<text x="1138" y="492" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">동료 · 박지훈</text>
+<text x="1126" y="534" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="14" fill="#68707c">나 · 1단계 발언</text>
+<rect x="790" y="560" width="546" height="57" rx="8" fill="#edf0f4" stroke="#c7cbd1"/>
+<text x="808" y="578" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">불이야! 비상벨을 눌러 주변에 알릴게!</text>
+<line x1="612" y1="650" x2="1336" y2="650" stroke="#d3d6dc"/>
+<rect x="820" y="632" width="310" height="36" rx="8" fill="#f5f6f8" stroke="#c7cbd1"/>
+<text x="839" y="640" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" fill="#202630">2단계 · 엘리베이터 앞</text>
+<text x="612" y="690" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="16" fill="#68707c">박지훈 · 옆자리 동료</text>
+<rect x="612" y="722" width="724" height="102" rx="8" fill="#ffffff" stroke="#c7cbd1"/>
+<text x="632" y="743" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" fill="#202630">엘리베이터 금방 온다! 7층이면 계단보다 이게</text>
+<text x="632" y="778" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="20" fill="#202630">훨씬 빨라, 빨리 타!</text>
+<text x="612" y="846" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="14" fill="#68707c">이 영역만 스크롤 · 이전 단계 대화 다시 확인 가능</text>
+<line x1="580" y1="880" x2="1376" y2="880" stroke="#d3d6dc"/>
+<text x="612" y="896" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">이번 단계 판단 기회 3회</text>
+<rect x="612" y="934" width="596" height="48" rx="8" fill="#fafbfc" stroke="#c7cbd1"/>
+<text x="628" y="946" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#787f89">어떻게 행동할지 말해 보세요</text>
+<rect x="1224" y="934" width="112" height="48" rx="8" fill="#e4e7ec" stroke="#c7cbd1"/>
+<text x="1250" y="946" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="18" fill="#202630">보내기</text>
+<text x="1210" y="986" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="13" fill="#68707c">0 / 300자</text>
+<text x="64" y="1030" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="17" fill="#505966">설계: 상단 상태·입력창 유지 / 대화만 스크롤 / 단계별 정답을 플레이 중 먼저 공개하지 않음</text>
+<text x="64" y="1064" dominant-baseline="text-before-edge" font-family="Malgun Gothic, sans-serif" font-size="15" fill="#68707c">현재 화면은 위험도 0인 정상 상태. 변화·대기·오류·종료는 별도 상태 시트 참고. API 보완 항목은 검토 문서에 명시.</text>
+</svg>
