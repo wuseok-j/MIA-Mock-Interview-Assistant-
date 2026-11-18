@@ -30,6 +30,13 @@ class DecisionTests(unittest.TestCase):
         for text in ['119', '불이야라고 하면 돼?', '119 신고하지 않겠어']:
             self.assertEqual(rules.observe(harness.current_stage(self.session), text), [])
 
+    def test_question_sentence_does_not_cancel_following_action(self):
+        # 실제 리허설에서 발견: 앞 문장이 질문이면 뒤의 행동까지 무시되던 문제
+        stage = harness.current_stage(self.session)
+        self.assertEqual(rules.observe(stage, '헐 불 난 거 아냐? 사람들한테 빨리 알리자'), ['warn'])
+        self.assertEqual(rules.observe(stage, '불이야! 근데 신고는 내가 해야 돼?'), ['warn'])
+        self.assertEqual(rules.observe(stage, '불났어요! 119 신고하지 않겠어'), ['warn'])
+
     def test_overconfident_ai_cannot_create_evidence_or_success_reply(self):
         with patch('app.ai.judge_action', return_value={'verdict': 'correct', 'reply': '이미 성공했어!', 'reason': 'test'}):
             messages = self.say('119')

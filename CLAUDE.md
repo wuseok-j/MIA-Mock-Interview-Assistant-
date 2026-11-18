@@ -129,7 +129,8 @@
 - 프론트: React + Vite
 - 백엔드/하네스: Python + FastAPI
 - DB: SQLite (개발) → PostgreSQL (배포)
-- LLM: 외부 API (후보: Claude Haiku 계열 = 진행, Claude Sonnet 계열 = 평가). 1주차에 품질·속도·비용 비교 후 확정
+- LLM: **Google Gemini** (`gemini-3.1-flash-lite`, 2026-11-17 전환). 호출은 `backend/app/gemini.py` REST 어댑터, 서버는 `ai.py` 만 부른다. 키가 없거나 `LLM_PROVIDER=mock` 이면 가짜 AI로 동작. (초기 후보였던 Claude 연결 코드는 PR #10에서 대체됨)
+- 상세 구조·기능 목록·DB 초안: `docs/architecture.md` / 실제 AI 리허설 결과: `docs/실제AI_리허설.md`
 - 협업: GitHub (main 보호 규칙 + PR, CODEOWNERS로 리더 승인 필수), Notion
 
 ---
