@@ -51,3 +51,10 @@ python play_test.py          # fire_office 기준 자동 플레이
 uvicorn app.main:app --reload   # http://localhost:8000/docs 에서 새 시나리오로 직접 플레이
 ```
 JSON 문법 오류가 있으면 서버가 켜지지 않는다. VS Code에서 열면 빨간 줄로 위치를 알려 준다.
+
+## 운영자 CMS로 편집하기 (2026-11-18 추가)
+
+JSON을 직접 고치는 대신 웹 화면 오른쪽 위 **운영자** 메뉴에서 만들고 고칠 수 있다. (설정: 루트 README "운영자 CMS")
+- `status`: `"draft"`(작성 중, 이용자에게 안 보임) / `"published"`(공개). 없으면 공개로 본다.
+- `role_doc.world_facts`, 단계별 `facts`: 이용자 질문에 AI가 일관되게 답하기 위한 상황 정보 (위치·인원·사정 등). 대피 요령은 넣지 않는다.
+- 저장할 때 서버가 이 문서의 규칙을 검사한다. 오류 메시지가 어떤 칸이 문제인지 알려 준다.

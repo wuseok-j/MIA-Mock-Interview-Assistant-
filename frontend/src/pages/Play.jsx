@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { api } from "../api.js";
+import { activePlay, api } from "../api.js";
 import { categoryEmoji, riskLevel } from "../ui.js";
 
 const MAX_LEN = 300;
 
-export default function Play({ scenario, onFinish, onExit }) {
+// adminToken 이 있으면 운영자 미리 플레이 (작성 중 시나리오도 시작 가능)
+// resumeId 가 있으면 새로 시작하지 않고 서버 DB에 저장된 플레이를 이어서 한다
+export default function Play({ scenario, onFinish, onExit, adminToken, resumeId }) {
   const [turn, setTurn] = useState(null);        // 마지막으로 받은 Turn (상태값: 단계·위험도·status)
   const [messages, setMessages] = useState([]);  // 지금까지의 채팅 전체
   const [pending, setPending] = useState("");    // 서버 응답을 기다리는 내 말
@@ -26,16 +28,27 @@ export default function Play({ scenario, onFinish, onExit }) {
     if (box) box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
   }, [messages, pending, error]);
 
-  async function start() {
+  async function start(fresh = false) {
     setError("");
     try {
-      const t = await api.startSession(scenario.id);
+      const t = resumeId && !fresh
+        ? await api.resumeSession(resumeId)
+        : await api.startSession(scenario.id, adminToken);
       setTurn(t);
       setMessages(t.messages);
+      remember(t);
     } catch (e) {
       started.current = false;
+      if (resumeId && !fresh) activePlay.clear();   // 만료·삭제된 플레이는 잊는다
       setError(e.message);
     }
+  }
+
+  // 진행 중이면 이 브라우저에 기억(이어하기용), 끝났으면 지운다. 운영자 미리 플레이는 기억하지 않는다.
+  function remember(t) {
+    if (adminToken) return;
+    if (t.status === "playing") activePlay.save(t.session_id, scenario);
+    else activePlay.clear();
   }
 
   async function send(e) {
@@ -49,6 +62,7 @@ export default function Play({ scenario, onFinish, onExit }) {
       const t = await api.sendMessage(turn.session_id, text);
       setTurn(t);
       setMessages((prev) => [...prev, ...t.messages]); // 서버가 내 말도 같이 돌려준다
+      remember(t);
     } catch (err) {
       setInput(text); // 실패하면 쓴 문장을 되돌려 놓는다
       setError(err.message);
@@ -87,7 +101,7 @@ export default function Play({ scenario, onFinish, onExit }) {
       )}
 
       <div className="mission-strip">{scenario.briefing?.mission || "동료와 안전하게 대피하기"}
-        {turn && <span>이번 단계 판단 기회 {turn.attempts_left}회</span>}
+        {turn && <span>행동 시도 기회 {turn.attempts_left}회 · 질문은 자유</span>}
       </div>
       {!!turn?.conditions?.length && <div className="condition-trail" aria-label="이전 선택의 영향">{turn.conditions.map((label, i) => <span key={i}>{label}</span>)}</div>}
       {/* 채팅 */}
@@ -97,7 +111,9 @@ export default function Play({ scenario, onFinish, onExit }) {
         {pending && <div className="typing">상대가 반응하는 중…</div>}
         {error && (
           <div className="error-box">
-            {error} {!turn && <button onClick={start}>다시 시도</button>}
+            {error} {!turn && (resumeId
+              ? <button onClick={() => { started.current = true; start(true); }}>새로 시작</button>
+              : <button onClick={() => start()}>다시 시도</button>)}
           </div>
         )}
       </div>
@@ -114,7 +130,7 @@ export default function Play({ scenario, onFinish, onExit }) {
             value={input}
             aria-label="내가 할 행동"
             onChange={(e) => setInput(e.target.value.slice(0, MAX_LEN))}
-            placeholder={turn ? "어떻게 행동할지 말해 보세요" : "준비 중…"}
+            placeholder={turn ? "행동을 말하거나, 궁금한 걸 물어보세요" : "준비 중…"}
             disabled={!turn || !!pending}
             autoFocus
           />

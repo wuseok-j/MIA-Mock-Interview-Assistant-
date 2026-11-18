@@ -3,10 +3,10 @@
 이 파일은 '요청을 받고 응답 형식을 맞추는' 일만 한다.
 진행 규칙은 harness.py, AI 호출은 ai.py, 입력 필터는 safety.py 에 있다.
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from . import harness
+from . import cms, harness
 from .schemas import MessageRequest, Report, ScenarioSummary, StartRequest, Turn
 
 app = FastAPI(title="MIA 재난·안전 롤플레잉 API")
@@ -16,12 +16,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(cms.router)   # 운영자 CMS: /admin/...
+
+
+def _published(sc: dict) -> bool:
+    return sc.get("status", "published") == "published"
 
 
 def _get(session_id: str) -> harness.Session:
-    s = harness.SESSIONS.get(session_id)
+    s = harness.get_session(session_id)   # 메모리 → 없으면 DB (새로고침·서버 재시작 후에도 이어짐)
     if not s:
-        raise HTTPException(404, "플레이 기록을 찾을 수 없습니다.")
+        raise HTTPException(404, "플레이 기록을 찾을 수 없거나 만료되었습니다. (24시간 동안 활동이 없으면 만료)")
     return s
 
 
@@ -37,23 +42,32 @@ def _turn(s: harness.Session, messages: list[dict]) -> Turn:
 
 @app.get("/scenarios", response_model=list[ScenarioSummary])
 def list_scenarios():
-    return [harness.public_scenario(sc) for sc in harness.SCENARIOS.values()]
+    return [harness.public_scenario(sc) for sc in harness.SCENARIOS.values() if _published(sc)]
 
 
 @app.get("/scenarios/{scenario_id}", response_model=ScenarioSummary)
-def get_scenario(scenario_id: str):
+def get_scenario(scenario_id: str, x_admin_token: str | None = Header(default=None)):
     sc = harness.SCENARIOS.get(scenario_id)
-    if not sc:
+    if not sc or not (_published(sc) or cms.admin_token_ok(x_admin_token)):
         raise HTTPException(404, "시나리오를 찾을 수 없습니다.")
     return harness.public_scenario(sc)
 
 
 @app.post("/sessions", response_model=Turn)
-def start_session(req: StartRequest):
-    if req.scenario_id not in harness.SCENARIOS:
+def start_session(req: StartRequest, x_admin_token: str | None = Header(default=None)):
+    sc = harness.SCENARIOS.get(req.scenario_id)
+    # 작성 중(draft) 시나리오는 운영자 미리 플레이로만 시작할 수 있다.
+    if not sc or not (_published(sc) or cms.admin_token_ok(x_admin_token)):
         raise HTTPException(404, "시나리오를 찾을 수 없습니다.")
     s, messages = harness.create_session(req.scenario_id)
     return _turn(s, messages)
+
+
+@app.get("/sessions/{session_id}", response_model=Turn)
+def resume_session(session_id: str):
+    """이어하기: 지금까지의 대화 전체와 현재 상태를 돌려준다."""
+    s = _get(session_id)
+    return _turn(s, [{"role": m["role"], "name": m["name"], "text": m["text"]} for m in s.transcript])
 
 
 @app.post("/sessions/{session_id}/messages", response_model=Turn)

@@ -1,4 +1,5 @@
 """Gemini 요청 계약·오류 복구 검증. 실제 네트워크·키를 사용하지 않는다."""
+import os as _os, tempfile as _tf; _os.environ.setdefault("MIA_DB_PATH", _os.path.join(_tf.mkdtemp(), "test.db"))  # 테스트는 임시 DB 사용
 import json
 import os
 import unittest

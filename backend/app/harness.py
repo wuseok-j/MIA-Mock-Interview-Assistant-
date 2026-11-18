@@ -13,16 +13,22 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, safety, rules
+from . import ai, db, safety, rules
 
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "data" / "scenarios"
 
 MAX_TURNS_PER_STAGE = 3   # 한 단계에서 판단할 기회. 다 쓰면 서버가 '실패'로 기록하고 다음 단계로 넘긴다.
+# 질문·대화는 판단 기회를 쓰지 않는다 (롤플레잉 자유도). 대신 단계당 횟수에 상한을 둔다 (토큰 비용 보호).
+# 상한을 넘으면 그 뒤의 말은 모두 판단 시도로 센다.
+MAX_FREE_TURNS_PER_STAGE = 6
 VERDICTS = {"correct", "wrong", "unclear"}
+INTENTS = {"action", "question", "chat"}
 MAX_REPLY_CHARS = 300     # 모델 대사가 너무 길면 자른다.
 
 # 키워드 가드: 모델이 correct 라고 해도, 이용자 입력에 그 단계의 행동 키워드가 하나도 없으면 인정하지 않는다.
@@ -49,7 +55,8 @@ class Session:
     stage_index: int = 0
     risk: int = 0
     turns_in_stage: int = 0
-    status: str = "playing"                     # playing | cleared | failed
+    free_turns_in_stage: int = 0                # 이번 단계에서 판단 기회를 쓰지 않은 질문·대화 수
+    status: str = "playing"                    # playing | cleared | failed
     stage_results: dict[int, str] = field(default_factory=dict)   # {단계번호: "correct" | "failed"}
     transcript: list[dict] = field(default_factory=list)          # {stage, role, name, text}
     blocked_count: int = 0                      # 안전 필터에 걸린 횟수 (리포트·로그용)
@@ -58,10 +65,15 @@ class Session:
     conditions: dict[str, str] = field(default_factory=dict)
     timeline: list[dict] = field(default_factory=list)
     report: dict | None = None                  # 한 번 만든 리포트는 저장해서 재사용 (AI 재호출 방지)
+    # DB 저장 위치 표시 (저장 안 함): 지난번까지 저장한 대화·판단 개수 → 다음엔 그 뒤만 추가
+    saved_messages: int = field(default=0, repr=False)
+    saved_decisions: int = field(default=0, repr=False)
 
 
-# TODO(장우석): SQLite 로 교체 (세션 이어하기·만료)
+# 진행 중인 세션은 메모리에 두고(빠름), 매 턴 끝에 DB(db.py)에도 저장한다.
+# 메모리에 없으면(서버 재시작 등) get_session 이 DB에서 불러온다.
 SESSIONS: dict[str, Session] = {}
+log = logging.getLogger("mia.harness")
 
 
 # ---------- 조회 도우미 ----------
@@ -98,11 +110,68 @@ def create_session(scenario_id: str) -> tuple[Session, list[dict]]:
     sc = SCENARIOS[scenario_id]
     s = Session(id=uuid.uuid4().hex[:12], scenario=sc)
     SESSIONS[s.id] = s
-    return s, _enter_stage(s)
+    out = _enter_stage(s)
+    persist(s)
+    return s, out
+
+
+def get_session(session_id: str) -> Session | None:
+    """메모리 → 없으면 DB에서 불러온다 (새로고침·서버 재시작 후 이어하기). 없거나 만료면 None."""
+    s = SESSIONS.get(session_id)
+    if s:
+        return s
+    try:
+        data = db.load_session(session_id)
+    except Exception:
+        log.exception("[db] 세션 불러오기 실패")
+        return None
+    if not data:
+        return None
+    state = data["state"]
+    s = Session(
+        id=data["id"], scenario=data["scenario"], stage_index=data["stage_index"], risk=data["risk"],
+        turns_in_stage=data["turns_in_stage"], free_turns_in_stage=data["free_turns"], status=data["status"],
+        blocked_count=data["blocked_count"],
+        # JSON 은 dict 키가 글자로 저장되므로 단계 번호를 다시 숫자로
+        stage_results={int(k): v for k, v in state.get("stage_results", {}).items()},
+        actions={int(k): v for k, v in state.get("actions", {}).items()},
+        evidence={int(k): v for k, v in state.get("evidence", {}).items()},
+        conditions=state.get("conditions", {}),
+        transcript=data["messages"], timeline=data["decisions"], report=data["report"],
+        saved_messages=len(data["messages"]), saved_decisions=len(data["decisions"]),
+    )
+    SESSIONS[s.id] = s
+    return s
+
+
+def persist(s: Session) -> None:
+    """DB 저장. 실패해도 플레이는 계속된다 (로그만 남김)."""
+    try:
+        s.saved_messages, s.saved_decisions = db.save_session(s, s.saved_messages, s.saved_decisions)
+    except Exception:
+        log.exception("[db] 세션 저장 실패")
 
 
 def handle_message(s: Session, text: str) -> list[dict]:
-    """이용자 한 마디를 처리하고, 화면에 보여줄 메시지 목록을 돌려준다."""
+    """이용자 한 마디를 처리하고, 화면에 보여줄 메시지 목록을 돌려준다. 끝나면 DB에 저장한다."""
+    out = _handle_message(s, text)
+    persist(s)
+    return out
+
+
+def _log_ai_call(s: Session, suggestion, ok: bool) -> None:
+    """AI 호출 1번을 기록한다 (토큰·응답 시간) → 운영자 통계와 1판 비용 계산의 근거."""
+    sug = suggestion if isinstance(suggestion, dict) else {}
+    reason = str(sug.get("reason", ""))
+    model = sug.get("model") or ("mock" if reason.startswith("mock") else os.getenv("LLM_MODEL_FAST", "unknown"))
+    try:
+        db.log_llm_call(s.id, s.scenario["id"], "judge", model, sug.get("usage"), sug.get("latency_ms"),
+                        "ok" if ok else "fallback")
+    except Exception:
+        log.exception("[db] AI 호출 기록 실패")
+
+
+def _handle_message(s: Session, text: str) -> list[dict]:
     if s.status != "playing":
         return []
     st = current_stage(s)
@@ -122,10 +191,11 @@ def handle_message(s: Session, text: str) -> list[dict]:
     # 2) AI 판정 제안
     history = [t for t in s.transcript if t["stage"] == st["stage"]
                and not (t["role"] == "user" and safety.check(t["text"]))]
-    context = {**st, "world_state": dict(s.conditions)}
-    suggestion = ai.judge_action(s.scenario, context, ch, text, history)
-    if (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
-            or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str)):
+    suggestion = ai.judge_action(s.scenario, _ai_context(s, st), ch, text, history)
+    failed = (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
+              or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str))
+    _log_ai_call(s, suggestion, not failed)
+    if failed:
         # API 장애를 이용자의 판단 실패로 계산하지 않는다.
         s.actions[st["stage"]].pop()
         _say(s, out, "system", "안내", "응답을 확인하지 못했습니다. 판단 기회와 위험도는 유지됩니다. 잠시 후 다시 말해 주세요.")
@@ -157,7 +227,17 @@ def handle_message(s: Session, text: str) -> list[dict]:
         reply = st.get("partial_reply", st["reactions"][verdict]) if verdict == "unclear" else st["reactions"][verdict]
     _say(s, out, "character", ch["name"], reply)
 
-    # 4) 서버 규칙으로 진행 결정
+    # 4) 판단 시도인지, 질문·대화인지 — 서버가 최종 결정
+    #    AI의 intent 는 '기회를 덜 쓰게' 만들 수만 있다. 근거·위험 행동이 잡히면 AI 분류와 무관하게 시도로 센다.
+    intent = suggestion.get("intent") if suggestion.get("intent") in INTENTS else "action"
+    is_attempt = (verdict != "unclear" or bool(observed) or intent == "action"
+                  or s.free_turns_in_stage >= MAX_FREE_TURNS_PER_STAGE)
+    if not is_attempt:
+        s.free_turns_in_stage += 1
+        s.actions[st["stage"]].pop()   # 리포트의 '판단 기록'에는 넣지 않는다 (대화 기록에는 남음)
+        return out
+
+    # 5) 서버 규칙으로 진행 결정
     s.turns_in_stage += 1
     if verdict == "correct":
         s.stage_results[st["stage"]] = "correct"
@@ -212,7 +292,33 @@ def _go_next(s: Session, next_stage: int | None) -> list[dict]:
         return out
     s.stage_index = next(i for i, x in enumerate(s.scenario["stages"]) if x["stage"] == next_stage)
     s.turns_in_stage = 0
+    s.free_turns_in_stage = 0
     return _enter_stage(s)
+
+
+def _ai_context(s: Session, st: dict) -> dict:
+    """AI에게 넘길 현재 단계 정보. 진행 결정에는 쓰지 않고, 자연스러운 대사를 위한 재료만 준다.
+
+    - world_facts: 질문에 일관되게 답하기 위한 상황 정보 (시나리오 공통 + 이 단계)
+    - confirmed/missing_actions: 이번 단계에서 이미 확인된 행동과 아직 남은 행동
+      → 일부만 맞았을 때 AI가 고정 문장 대신 자연스럽게 재촉한다. (정답을 직접 말하지는 않게 프롬프트로 제한)
+    - story_so_far: 지난 단계에서 일어난 일 → 대화가 단계마다 끊기지 않게
+    """
+    done = s.evidence.get(st["stage"], {})
+    rubric = st.get("rubric", [])
+    story = []
+    for prev in s.scenario["stages"][:s.stage_index]:
+        result = s.stage_results.get(prev["stage"])
+        story.append(f'{prev["stage"]}단계 「{prev["title"]}」: '
+                     + ("이용자가 직접 해냄" if result == "correct" else "이용자가 놓쳐서 다른 사람의 도움을 받음"))
+    return {
+        **st,
+        "world_state": dict(s.conditions),
+        "world_facts": list(s.scenario.get("role_doc", {}).get("world_facts", [])) + list(st.get("facts", [])),
+        "confirmed_actions": [item["label"] for item in rubric if item["id"] in done],
+        "missing_actions": [item["label"] for item in rubric if item["id"] not in done],
+        "story_so_far": story,
+    }
 
 
 def _enter_stage(s: Session) -> list[dict]:
@@ -282,4 +388,8 @@ def build_report(s: Session) -> dict:
         "checks": checks,
         "sources": [{"name": x["name"], "url": x["url"]} for x in sc.get("sources", [])],
     }
+    try:
+        db.save_report(s.id, s.report)   # 다시 열거나 서버가 재시작돼도 AI를 또 부르지 않게
+    except Exception:
+        log.exception("[db] 리포트 저장 실패")
     return s.report
