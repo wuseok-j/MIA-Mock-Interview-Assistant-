@@ -5,6 +5,7 @@
   2) 인젝션 시도   → 안전 필터가 막고 단계가 그대로인지
   3) 위험한 플레이 → 위험도 한계로 failed
 """
+import os as _os, tempfile as _tf; _os.environ.setdefault("MIA_DB_PATH", _os.path.join(_tf.mkdtemp(), "test.db"))  # 테스트는 임시 DB 사용
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 

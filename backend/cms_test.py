@@ -2,6 +2,7 @@
 
 실행: python -X utf8 cms_test.py
 """
+import os as _os, tempfile as _tf; _os.environ.setdefault("MIA_DB_PATH", _os.path.join(_tf.mkdtemp(), "test.db"))  # 테스트는 임시 DB 사용
 import copy
 import json
 import os

@@ -24,9 +24,9 @@ def _published(sc: dict) -> bool:
 
 
 def _get(session_id: str) -> harness.Session:
-    s = harness.SESSIONS.get(session_id)
+    s = harness.get_session(session_id)   # 메모리 → 없으면 DB (새로고침·서버 재시작 후에도 이어짐)
     if not s:
-        raise HTTPException(404, "플레이 기록을 찾을 수 없습니다.")
+        raise HTTPException(404, "플레이 기록을 찾을 수 없거나 만료되었습니다. (24시간 동안 활동이 없으면 만료)")
     return s
 
 
@@ -61,6 +61,13 @@ def start_session(req: StartRequest, x_admin_token: str | None = Header(default=
         raise HTTPException(404, "시나리오를 찾을 수 없습니다.")
     s, messages = harness.create_session(req.scenario_id)
     return _turn(s, messages)
+
+
+@app.get("/sessions/{session_id}", response_model=Turn)
+def resume_session(session_id: str):
+    """이어하기: 지금까지의 대화 전체와 현재 상태를 돌려준다."""
+    s = _get(session_id)
+    return _turn(s, [{"role": m["role"], "name": m["name"], "text": m["text"]} for m in s.transcript])
 
 
 @app.post("/sessions/{session_id}/messages", response_model=Turn)

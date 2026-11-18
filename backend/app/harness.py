@@ -13,11 +13,13 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ai, safety, rules
+from . import ai, db, safety, rules
 
 SCENARIO_DIR = Path(__file__).resolve().parents[2] / "data" / "scenarios"
 
@@ -63,10 +65,15 @@ class Session:
     conditions: dict[str, str] = field(default_factory=dict)
     timeline: list[dict] = field(default_factory=list)
     report: dict | None = None                  # 한 번 만든 리포트는 저장해서 재사용 (AI 재호출 방지)
+    # DB 저장 위치 표시 (저장 안 함): 지난번까지 저장한 대화·판단 개수 → 다음엔 그 뒤만 추가
+    saved_messages: int = field(default=0, repr=False)
+    saved_decisions: int = field(default=0, repr=False)
 
 
-# TODO(장우석): SQLite 로 교체 (세션 이어하기·만료)
+# 진행 중인 세션은 메모리에 두고(빠름), 매 턴 끝에 DB(db.py)에도 저장한다.
+# 메모리에 없으면(서버 재시작 등) get_session 이 DB에서 불러온다.
 SESSIONS: dict[str, Session] = {}
+log = logging.getLogger("mia.harness")
 
 
 # ---------- 조회 도우미 ----------
@@ -103,11 +110,68 @@ def create_session(scenario_id: str) -> tuple[Session, list[dict]]:
     sc = SCENARIOS[scenario_id]
     s = Session(id=uuid.uuid4().hex[:12], scenario=sc)
     SESSIONS[s.id] = s
-    return s, _enter_stage(s)
+    out = _enter_stage(s)
+    persist(s)
+    return s, out
+
+
+def get_session(session_id: str) -> Session | None:
+    """메모리 → 없으면 DB에서 불러온다 (새로고침·서버 재시작 후 이어하기). 없거나 만료면 None."""
+    s = SESSIONS.get(session_id)
+    if s:
+        return s
+    try:
+        data = db.load_session(session_id)
+    except Exception:
+        log.exception("[db] 세션 불러오기 실패")
+        return None
+    if not data:
+        return None
+    state = data["state"]
+    s = Session(
+        id=data["id"], scenario=data["scenario"], stage_index=data["stage_index"], risk=data["risk"],
+        turns_in_stage=data["turns_in_stage"], free_turns_in_stage=data["free_turns"], status=data["status"],
+        blocked_count=data["blocked_count"],
+        # JSON 은 dict 키가 글자로 저장되므로 단계 번호를 다시 숫자로
+        stage_results={int(k): v for k, v in state.get("stage_results", {}).items()},
+        actions={int(k): v for k, v in state.get("actions", {}).items()},
+        evidence={int(k): v for k, v in state.get("evidence", {}).items()},
+        conditions=state.get("conditions", {}),
+        transcript=data["messages"], timeline=data["decisions"], report=data["report"],
+        saved_messages=len(data["messages"]), saved_decisions=len(data["decisions"]),
+    )
+    SESSIONS[s.id] = s
+    return s
+
+
+def persist(s: Session) -> None:
+    """DB 저장. 실패해도 플레이는 계속된다 (로그만 남김)."""
+    try:
+        s.saved_messages, s.saved_decisions = db.save_session(s, s.saved_messages, s.saved_decisions)
+    except Exception:
+        log.exception("[db] 세션 저장 실패")
 
 
 def handle_message(s: Session, text: str) -> list[dict]:
-    """이용자 한 마디를 처리하고, 화면에 보여줄 메시지 목록을 돌려준다."""
+    """이용자 한 마디를 처리하고, 화면에 보여줄 메시지 목록을 돌려준다. 끝나면 DB에 저장한다."""
+    out = _handle_message(s, text)
+    persist(s)
+    return out
+
+
+def _log_ai_call(s: Session, suggestion, ok: bool) -> None:
+    """AI 호출 1번을 기록한다 (토큰·응답 시간) → 운영자 통계와 1판 비용 계산의 근거."""
+    sug = suggestion if isinstance(suggestion, dict) else {}
+    reason = str(sug.get("reason", ""))
+    model = sug.get("model") or ("mock" if reason.startswith("mock") else os.getenv("LLM_MODEL_FAST", "unknown"))
+    try:
+        db.log_llm_call(s.id, s.scenario["id"], "judge", model, sug.get("usage"), sug.get("latency_ms"),
+                        "ok" if ok else "fallback")
+    except Exception:
+        log.exception("[db] AI 호출 기록 실패")
+
+
+def _handle_message(s: Session, text: str) -> list[dict]:
     if s.status != "playing":
         return []
     st = current_stage(s)
@@ -128,8 +192,10 @@ def handle_message(s: Session, text: str) -> list[dict]:
     history = [t for t in s.transcript if t["stage"] == st["stage"]
                and not (t["role"] == "user" and safety.check(t["text"]))]
     suggestion = ai.judge_action(s.scenario, _ai_context(s, st), ch, text, history)
-    if (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
-            or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str)):
+    failed = (not isinstance(suggestion, dict) or suggestion.get("reason") == "fallback"
+              or suggestion.get("verdict") not in VERDICTS or not isinstance(suggestion.get("reply"), str))
+    _log_ai_call(s, suggestion, not failed)
+    if failed:
         # API 장애를 이용자의 판단 실패로 계산하지 않는다.
         s.actions[st["stage"]].pop()
         _say(s, out, "system", "안내", "응답을 확인하지 못했습니다. 판단 기회와 위험도는 유지됩니다. 잠시 후 다시 말해 주세요.")
@@ -322,4 +388,8 @@ def build_report(s: Session) -> dict:
         "checks": checks,
         "sources": [{"name": x["name"], "url": x["url"]} for x in sc.get("sources", [])],
     }
+    try:
+        db.save_report(s.id, s.report)   # 다시 열거나 서버가 재시작돼도 AI를 또 부르지 않게
+    except Exception:
+        log.exception("[db] 리포트 저장 실패")
     return s.report

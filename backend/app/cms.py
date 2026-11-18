@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, Field
 
-from . import harness, scenario_check
+from . import db, harness, scenario_check
 
 router = APIRouter(prefix="/admin", tags=["운영자 CMS"])
 
@@ -66,21 +66,11 @@ def _write(sc: dict) -> None:
 
 
 def _stats(scenario_id: str) -> dict:
-    """서버 메모리의 플레이 기록으로 집계 (서버 재시작 시 초기화 — DB 저장 후 정확해짐)."""
-    sessions = [s for s in harness.SESSIONS.values() if s.scenario.get("id") == scenario_id]
-    finished = [s for s in sessions if s.status != "playing"]
-    stage_fail: dict[int, int] = {}
-    for s in finished:
-        for no, result in s.stage_results.items():
-            if result != "correct":
-                stage_fail[no] = stage_fail.get(no, 0) + 1
-    return {
-        "plays": len(sessions),
-        "finished": len(finished),
-        "cleared": sum(s.status == "cleared" for s in finished),
-        "avg_passed": round(sum(sum(r == "correct" for r in s.stage_results.values()) for s in finished) / len(finished), 1) if finished else None,
-        "stage_fail": stage_fail,
-    }
+    """DB에 저장된 플레이 기록·AI 호출 기록으로 집계 (서버를 재시작해도 유지)."""
+    try:
+        return db.scenario_stats(scenario_id)
+    except Exception:
+        return {"plays": 0, "finished": 0, "cleared": 0, "avg_passed": None, "stage_fail": {}, "ai": None}
 
 
 def _summary(sc: dict) -> dict:

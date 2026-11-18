@@ -158,3 +158,11 @@
 | `POST /admin/validate` 시나리오 JSON | 저장 없이 검사만 → `{errors, warnings}` |
 
 이용자 API 변화: `GET /scenarios` 는 `status=published`(없으면 published 로 간주)만 보여 준다. 작성 중 시나리오는 `GET /scenarios/{id}`·`POST /sessions` 에 운영자 토큰 헤더가 있을 때만 열린다 (미리 플레이).
+
+## v0.6 이어하기 `GET /sessions/{session_id}` (DB 저장)
+
+응답 = **Turn**. 단, `messages` 에 **지금까지의 대화 전체**가 들어 있다 (화면은 받은 그대로 다시 그리면 된다).
+- 세션은 매 턴 서버 DB(SQLite)에 저장되므로 새로고침·서버 재시작 후에도 이어진다.
+- 마지막 활동 후 24시간이 지난 '진행 중' 세션은 만료 → 404. 끝난 세션은 리포트 조회가 계속 된다.
+- `GET /sessions/{id}/report` 는 한 번 만든 리포트를 DB에 저장해 두고 다시 만들지 않는다.
+- 운영자 `GET /admin/scenarios` 의 `stats` 는 DB 기준이며 `ai: {calls, input_tokens, output_tokens, avg_latency_ms, fallbacks, cost_per_play_krw}` 가 추가됐다 (`cost_per_play_krw` 는 `.env` 의 PRICE_* 를 설정했을 때만 값이 있음, 가짜 AI 호출은 제외).

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { api } from "../api.js";
+import { activePlay, api } from "../api.js";
 import { categoryEmoji } from "../ui.js";
 
-export default function ScenarioList({ onSelect }) {
+export default function ScenarioList({ onSelect, onResume }) {
   const [scenarios, setScenarios] = useState(null);
   const [error, setError] = useState("");
+  const [active, setActive] = useState(activePlay.load());   // 진행 중이던 플레이 (이어하기)
 
   const load = () => {
     setError("");
@@ -24,6 +25,19 @@ export default function ScenarioList({ onSelect }) {
           <div><b>03 · 근거로 돌아보기</b><span>내 발언과 행동 기준을 나란히 봅니다.</span></div>
         </div>
       </section>
+
+      {active && (
+        <div className="resume-banner">
+          <div>
+            <b>진행 중인 플레이가 있어요</b>
+            <span>{active.scenario.title} · 서버에 저장된 곳부터 이어서 할 수 있습니다.</span>
+          </div>
+          <div className="resume-actions">
+            <button className="primary" onClick={() => onResume(active)}>이어하기</button>
+            <button onClick={() => { activePlay.clear(); setActive(null); }}>닫기</button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="error-box">

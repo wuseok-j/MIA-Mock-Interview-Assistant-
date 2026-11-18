@@ -69,7 +69,8 @@ def judge(scenario, stage, character, user_text, history):
                 # intent 가 없거나 이상하면 'action'(판단 시도)으로 본다 → 기회를 아끼는 쪽으로 잘못 갈 수 없음
                 intent = data.get('intent') if data.get('intent') in ('action', 'question', 'chat') else 'action'
                 return {'verdict': data['verdict'], 'intent': intent, 'reply': data['reply'].strip()[:300],
-                        'reason': data['reason'][:300], 'usage': counts, 'model': model}
+                        'reason': data['reason'][:300], 'usage': counts, 'model': model,
+                        'latency_ms': round((time.monotonic() - started) * 1000)}
             except (ValueError, TypeError, AttributeError, IndexError):
                 log.warning('[gemini] 응답 형식 오류 (시도 %d/2)', attempt + 1)
     return dict(FALLBACK)

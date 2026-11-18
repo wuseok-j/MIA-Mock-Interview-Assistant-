@@ -33,6 +33,8 @@ export const api = {
   // adminToken 을 주면 작성 중(draft) 시나리오도 시작된다 (운영자 미리 플레이)
   startSession: (scenarioId, adminToken) =>
     request("/sessions", { method: "POST", body: JSON.stringify({ scenario_id: scenarioId }) }, adminToken),
+  // 이어하기: 지금까지의 대화 전체 + 현재 상태 (서버 DB에서 불러옴)
+  resumeSession: (sessionId) => request(`/sessions/${sessionId}`),
   sendMessage: (sessionId, text) =>
     request(`/sessions/${sessionId}/messages`, { method: "POST", body: JSON.stringify({ text }) }),
   getReport: (sessionId) => request(`/sessions/${sessionId}/report`),
@@ -49,6 +51,20 @@ export const adminApi = {
   save: (t, sc) => request(`/admin/scenarios/${sc.id}`, json("PUT", sc), t),
   setStatus: (t, id, status) => request(`/admin/scenarios/${id}/status`, json("POST", { status }), t),
   validate: (t, sc) => request("/admin/validate", json("POST", sc), t),
+};
+
+// 진행 중인 플레이를 이 브라우저에 기억 → 목록 화면에서 '이어하기'. (실제 진행 상태는 서버 DB에 있다)
+export const activePlay = {
+  load() { try { return JSON.parse(localStorage.getItem("mia-active-play") || "null"); } catch { return null; } },
+  save(sessionId, scenario) {
+    try {
+      localStorage.setItem("mia-active-play", JSON.stringify({
+        sessionId, savedAt: Date.now(),
+        scenario: { id: scenario.id, title: scenario.title, category: scenario.category, briefing: scenario.briefing || {} },
+      }));
+    } catch { /* 저장 불가 환경은 무시 */ }
+  },
+  clear() { try { localStorage.removeItem("mia-active-play"); } catch { /* 무시 */ } },
 };
 
 // 운영자 토큰은 이 브라우저 탭에만 잠깐 기억한다 (창을 닫으면 사라짐)

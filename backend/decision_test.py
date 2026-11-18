@@ -1,4 +1,5 @@
 """판정·인과관계 회귀 검증. 실제 API를 호출하지 않는다."""
+import os as _os, tempfile as _tf; _os.environ.setdefault("MIA_DB_PATH", _os.path.join(_tf.mkdtemp(), "test.db"))  # 테스트는 임시 DB 사용
 import unittest
 from unittest.mock import patch
 from fastapi.testclient import TestClient

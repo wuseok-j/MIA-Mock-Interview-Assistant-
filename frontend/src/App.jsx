@@ -27,7 +27,10 @@ export default function App() {
       </header>
 
       {screen.name === "list" && (
-        <ScenarioList onSelect={(scenario) => setScreen({ name: "briefing", scenario })} />
+        <ScenarioList
+          onSelect={(scenario) => setScreen({ name: "briefing", scenario })}
+          onResume={(active) => setScreen({ name: "play", scenario: active.scenario, resumeId: active.sessionId, playKey: Date.now() })}
+        />
       )}
       {screen.name === "briefing" && (
         <Briefing scenario={screen.scenario}
@@ -39,6 +42,7 @@ export default function App() {
           key={screen.playKey}
           scenario={screen.scenario}
           adminToken={screen.preview ? adminSession.load() : undefined}
+          resumeId={screen.resumeId}
           onFinish={(sessionId) => setScreen({ name: "report", sessionId, scenario: screen.scenario, preview: screen.preview })}
           onExit={() => setScreen(screen.preview ? { name: "adminEdit", id: screen.scenario.id } : { name: "list" })}
         />

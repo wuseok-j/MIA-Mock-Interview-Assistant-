@@ -102,6 +102,14 @@ export default function AdminHome({ onEdit, onPreview }) {
                 {!!Object.keys(r.stats.stage_fail).length && (
                   <div className="muted">많이 놓친 단계: {Object.entries(r.stats.stage_fail).sort((a, b) => b[1] - a[1]).slice(0, 2).map(([s, n]) => `${s}단계(${n})`).join(", ")}</div>
                 )}
+                {!!r.stats.ai?.calls && (
+                  <div className="muted">
+                    AI {r.stats.ai.calls}회 · 평균 {(r.stats.ai.avg_latency_ms / 1000).toFixed(1)}초
+                    · 토큰 {Math.round((r.stats.ai.input_tokens + r.stats.ai.output_tokens) / Math.max(1, r.stats.plays)).toLocaleString()}/판
+                    {r.stats.ai.cost_per_play_krw !== null ? ` · 약 ${r.stats.ai.cost_per_play_krw}원/판` : " · 비용: .env 가격 미설정"}
+                    {!!r.stats.ai.fallbacks && ` · 실패 ${r.stats.ai.fallbacks}회`}
+                  </div>
+                )}
               </td>
               <td className="row-actions">
                 <button onClick={() => onEdit(r.id)}>편집</button>
@@ -112,7 +120,7 @@ export default function AdminHome({ onEdit, onPreview }) {
           ))}
         </tbody>
       </table>
-      <p className="muted small">이용 현황은 서버가 켜진 뒤의 기록입니다. (플레이 기록 DB 저장은 4주차 작업)</p>
+      <p className="muted small">이용 현황은 DB(<code>backend/mia.db</code>)에 저장된 전체 기록입니다. AI 수치는 실제 AI 호출만 셉니다 (가짜 AI 제외).</p>
 
       <section className="admin-card">
         <h2>새 시나리오</h2>

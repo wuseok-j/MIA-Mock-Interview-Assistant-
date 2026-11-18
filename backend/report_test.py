@@ -1,4 +1,5 @@
 """API 키 없이 리포트 근거와 필터 제외, 세션 격리를 검증한다."""
+import os as _os, tempfile as _tf; _os.environ.setdefault("MIA_DB_PATH", _os.path.join(_tf.mkdtemp(), "test.db"))  # 테스트는 임시 DB 사용
 from fastapi.testclient import TestClient
 from unittest.mock import patch
 from app.main import app

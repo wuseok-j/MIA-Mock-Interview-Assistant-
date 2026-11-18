@@ -289,3 +289,12 @@ button.ghost { border: none; background: none; color: var(--muted); padding: 6px
   .admin-table td { border: 0; padding: 6px 12px; }
   .row-actions { justify-content: flex-start; }
 }
+
+/* ---------- 이어하기 배너 ---------- */
+.resume-banner {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap;
+  background: #fff4e6; border: 1px solid #ffd8a8; border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px;
+}
+.resume-banner b { display: block; }
+.resume-banner span { font-size: 14px; color: var(--muted); }
+.resume-actions { display: flex; gap: 8px; }
