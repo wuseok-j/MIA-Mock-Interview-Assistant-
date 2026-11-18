@@ -10,7 +10,7 @@
 ```mermaid
 flowchart LR
     U[이용자 웹<br/>React] --> API
-    O[운영자 CMS<br/>⬜ 예정] -.-> API
+    O[운영자 CMS<br/>React /admin] --> API
     subgraph 서버 [백엔드 · FastAPI]
         API[API<br/>main.py] --> SF[안전 필터<br/>safety.py]
         SF --> H[하네스<br/>harness.py + rules.py]
@@ -30,7 +30,7 @@ flowchart LR
 | AI 어댑터 (`ai.py`, `gemini.py`, `prompts.py`) | 캐릭터 대사 + 판정 *제안*. 키 없으면 가짜 AI | ✅ (리포트 문장은 🟡 고정 문구) |
 | 시나리오 (`data/scenarios/*.json`) | 롤 문서 + 단계 문서 + 행동 기준(rubric) + 출처 | ✅ 화재 1개 |
 | DB | 세션·대화·리포트·토큰 로그 저장 | ⬜ (서버 재시작 시 기록 사라짐) |
-| 운영자 CMS | 시나리오 업로드·관리, 이용 통계 | ⬜ |
+| 운영자 CMS (`cms.py`, `scenario_check.py`, `AdminHome/AdminEditor.jsx`) | 시나리오 만들기·편집·검사·공개, 미리 플레이, 간단한 이용 현황 | ✅ 파일 저장 (DB는 4주차) |
 | 로그인·결제 | 기관 단위 이용권 | ⬜ |
 
 ## 2. 한 턴의 흐름 (멘토가 가장 중요하게 보는 부분)
@@ -86,10 +86,12 @@ sequenceDiagram
 
 | 기능 | 상태 | 우선 |
 |---|---|---|
-| 시나리오 작성 | 🟡 팀이 JSON 직접 작성 | A |
-| 시나리오 업로드·수정 화면 (CMS) | ⬜ | C |
+| 시나리오 작성 | ✅ CMS 편집기 (JSON 직접 작성도 가능) | A |
+| 시나리오 만들기·복제·수정·검사·공개 (CMS) | ✅ `AdminHome.jsx`, `AdminEditor.jsx`, `backend/app/cms.py` | A |
+| 작성 중 시나리오 미리 플레이 | ✅ | A |
 | 장면·캐릭터 이미지 업로드 | ⬜ | C |
-| 소속 이용자 플레이 현황·통계 | ⬜ | C |
+| 소속 이용자 플레이 현황·통계 | 🟡 시나리오별 플레이 수·많이 놓친 단계 (서버 메모리 기준, DB 저장 후 정확) | B |
+| 운영자 로그인 | 🟡 공용 토큰 1개 (`ADMIN_TOKEN`). 기관별 계정은 로그인 기능과 함께 | C |
 | AI 설정 (모델·말투 등) | ⬜ | C |
 
 ### 시스템
@@ -115,8 +117,9 @@ sequenceDiagram
 | 판단 복기 리포트 | 이용자 | ✅ | `Report.jsx` |
 | 로그인 | 공통 | ⬜ | |
 | 내 플레이 기록 | 이용자 | ⬜ | |
-| 시나리오 관리 (목록·편집) | 운영자 | ⬜ | |
-| 이용 통계 | 운영자 | ⬜ | |
+| 시나리오 관리 (목록·이용 현황·새로 만들기) | 운영자 | ✅ | `AdminHome.jsx` |
+| 시나리오 편집 (기본·배경·캐릭터·단계·평가·출처·JSON) | 운영자 | ✅ | `AdminEditor.jsx` |
+| 이용 통계 상세 | 운영자 | ⬜ | |
 
 곽동규 화면 목록(`docs/research/화면목록.md`)이 올라오면 이 표와 합친다.
 

@@ -4,7 +4,8 @@ import { categoryEmoji, riskLevel } from "../ui.js";
 
 const MAX_LEN = 300;
 
-export default function Play({ scenario, onFinish, onExit }) {
+// adminToken 이 있으면 운영자 미리 플레이 (작성 중 시나리오도 시작 가능)
+export default function Play({ scenario, onFinish, onExit, adminToken }) {
   const [turn, setTurn] = useState(null);        // 마지막으로 받은 Turn (상태값: 단계·위험도·status)
   const [messages, setMessages] = useState([]);  // 지금까지의 채팅 전체
   const [pending, setPending] = useState("");    // 서버 응답을 기다리는 내 말
@@ -29,7 +30,7 @@ export default function Play({ scenario, onFinish, onExit }) {
   async function start() {
     setError("");
     try {
-      const t = await api.startSession(scenario.id);
+      const t = await api.startSession(scenario.id, adminToken);
       setTurn(t);
       setMessages(t.messages);
     } catch (e) {

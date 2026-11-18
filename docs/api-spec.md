@@ -142,3 +142,19 @@
 여러 발언에서 확인한 행동을 단계별로 누적한다. 위험 행동이 판정되면 그 단계의 근거를 초기화하고 위험도를 올린다. 모든 필수 행동을 확인해야 통과하며, 기회가 소진되면 실패 기록과 도움받는 전개를 남긴다. `cleared`는 건물 밖 도착을 의미하며 모든 행동 통과를 뜻하지 않는다.
 
 현재는 JSON의 제한된 표현 패턴으로 근거를 검증한다. 미등록 표현·복잡한 부정·인용은 오판할 수 있다. 상세 한계와 시연 방법은 [설계 문서](decision-design.md)를 따른다.
+
+## v0.5 운영자 CMS `/admin/...`
+
+모든 요청에 헤더 `X-Admin-Token: <.env 의 ADMIN_TOKEN>` 필요. ADMIN_TOKEN 이 비어 있으면 503, 토큰이 틀리면 401.
+
+| 요청 | 하는 일 |
+|---|---|
+| `GET /admin/scenarios` | 전체 시나리오(작성 중 포함) 요약: status, 검사 오류·경고 수, 이용 현황 `stats{plays, finished, cleared, avg_passed, stage_fail}` |
+| `GET /admin/scenarios/{id}` | 시나리오 전체 JSON(정답·행동 기준 포함) + `errors`, `warnings`, `stats` |
+| `POST /admin/scenarios` `{id, title, category}` | 1단계 뼈대로 새로 만들기 (status=draft). id 는 `^[a-z][a-z0-9_]{2,39}$`, 중복이면 409 |
+| `POST /admin/scenarios/{id}/duplicate` `{id, title, category}` | 기존 시나리오 복제 (draft) |
+| `PUT /admin/scenarios/{id}` 시나리오 JSON | 검사 후 저장. 오류가 있으면 422 `{detail: {message, errors, warnings}}` 이고 저장하지 않음. id 변경 불가 |
+| `POST /admin/scenarios/{id}/status` `{status: "draft"|"published"}` | 공개/비공개. 공개는 검사 오류 0개일 때만 |
+| `POST /admin/validate` 시나리오 JSON | 저장 없이 검사만 → `{errors, warnings}` |
+
+이용자 API 변화: `GET /scenarios` 는 `status=published`(없으면 published 로 간주)만 보여 준다. 작성 중 시나리오는 `GET /scenarios/{id}`·`POST /sessions` 에 운영자 토큰 헤더가 있을 때만 열린다 (미리 플레이).
